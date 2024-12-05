@@ -32,6 +32,8 @@ class MainWindow(QMainWindow, form_class):
 
         self.ath_model = FaceRecognitionModel() # face athentification model
         self.setUserImage()
+
+        self.detect_model = ObjectDetectionModel()
     
         self.setLabelCams()
         self.cameraOn()
@@ -46,23 +48,31 @@ class MainWindow(QMainWindow, form_class):
         self.w, self.h = self.labelLegCam.width(), self.labelLegCam.height()
         self.legPixmap = QPixmap(self.w, self.h)
 
-    def msgMaker(self, msg):
+    def msgMaker(self):
         self.msg_list = []
+
+    def addMsg(self, msg):
         self.msg_list.append(msg)
 
     def sendData(self):
-        # self.labelCam.setText("hello")
-        msg = self.lineEdit.getText()
-        self.msgMaker(msg)
-        client_socket.connect((ESP32_IP, ESP32_PORT))
-        client_socket.send(self.msg_list)
+        message = self.lineEdit.text()
+        '''
+        TODO: need to solve error triggerd by "\msg\n"
+        '''
+        print(message)
+        msg = message.encode()
+        # client_socket.send(msg)
+        print(msg)
+        # print("CASS_brain said : ", msg)
+        # response = client_socket.recv(1024)
+        # print("CASS_leg said : ", response)
 
-    # def setUserImage(self):
-    #     self.path = "../../../test/data/face/my_img/soyoung.png"
-    #     self.name = "soyoung"
+    def setUserImage(self):
+        self.path = "../../../test/data/face/my_img/soyoung.png"
+        self.name = "soyoung"
 
-    #     self.ath_model.set_user_image(self.path)
-    #     self.ath_model.set_known_user(self.ath_model.my_face_encoding, self.name)
+        self.ath_model.set_user_image(self.path)
+        self.ath_model.set_known_user(self.ath_model.my_face_encoding, self.name)
 
     def cameraOn(self):
         '''
@@ -106,7 +116,14 @@ class MainWindow(QMainWindow, form_class):
                 if self.duration > 3 and self.duration < 4:
                     self.athentified = True
                     QMessageBox.warning(self, "Authentification ", f"{self.name} Driver Authentification Success.")
-                    self.msgMaker("run")
+                    message = "connect"
+                    msg = message.encode()
+                    client_socket.connect((ESP32_IP, ESP32_PORT))
+                    client_socket.send(msg)
+                    print("CASS_brain said : ", msg)
+                    response = client_socket.recv(1024) 
+                    print("CASS_leg said : ", response)
+                    self.labelFace.hide()
 
     def updateFaceCam(self):
         ret, face_frame = self.faceVideo.read()
@@ -118,7 +135,7 @@ class MainWindow(QMainWindow, form_class):
             self.end = time.time()
             self.duration = self.end - self.start
 
-            # self.authentification(frame)
+            self.authentification(frame)
             
             # self.DrowsyDetection(frame)
             
@@ -130,6 +147,28 @@ class MainWindow(QMainWindow, form_class):
             self.facePixmap = self.facePixmap.fromImage(qImg)
             self.facePixmap = self.facePixmap.scaled(self.width, self.height)
             self.labelFace.setPixmap(self.facePixmap)
+
+    # def objectDetection(self, frame):
+    #     class_names = []
+    #     widths = []
+    #     boxes = []  # 추가: 각 바운딩 박스 좌표 저장
+    #     for result in results[0].boxes:
+    #         x1, y1, x2, y2 = map(int, result.xyxy[0].tolist())
+    #         confidence = result.conf[0]
+    #         class_id = int(result.cls[0])
+    #         label = f"{names[class_id]}: {confidence:.2f}"
+
+    #         # 바운딩 박스 및 레이블 그리기
+    #         cv2.rectangle(image, (x1, y1), (x2, y2), color_finder(names[class_id]), 2)
+    #         cv2.putText(image, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color_finder(names[class_id]), 2)
+
+    #         ref_image_width = x2 - x1
+    #         #print("폭:", ref_image_width)
+    #         class_names.append(names[class_id])
+    #         widths.append(ref_image_width)
+    #         boxes.append((x1, y1, x2, y2))  # 바운딩 박스 좌표 저장
+
+    #     return class_names, widths, boxes
 
     def updateLegCam(self):
         ret, self.frame = self.legVideo.read()

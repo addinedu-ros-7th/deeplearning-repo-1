@@ -136,3 +136,46 @@ class FaceRecognitionModel():
                 face_locations = 0
 
         return face_locations, face_names
+    
+class ObjectDetectionModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.model_path = '/home/yoon/ws/yolov8/train5/weights/best.pt'
+        self.model = YOLO(self.model_path)
+
+        self.known_widths = {
+                                'person' : 5.54,
+                                'red_light' : 8.99,
+                                'green_light' : 8.99,
+                                'goat' : 9.89
+                            }
+        
+        self.mtx = np.array([[     672.52,           0,      330.84],
+                            [          0,      673.15,      257.85],
+                            [          0,           0,           1]])
+        
+        self.dist = np.array([[   -0.44717,     0.63559,   0.0029907, -0.00055208,    -0.94232]])
+
+        self.KNOWN_WIDTH = 5.54  # cm, 피규어 실제 너비
+        self.KNOWN_DISTANCE = 29.9  # cm, 참조 거리
+
+    def focal_length(measured_distance, real_width, width_in_rf_image):
+        return (width_in_rf_image * measured_distance) / real_width
+
+# 거리 계산 함수
+    def distance_finder(focal_length, real_width, width_in_frame):
+        return (real_width * focal_length) / width_in_frame
+
+    def color_finder(name):
+        if name == 'red_light':
+            color = (0, 0, 255)
+        elif name == 'green_light':
+            color = (0, 255, 0)
+        elif name == 'person':
+            color = (255, 0, 200)
+        elif name == 'goat':
+            color = (0, 215, 255)
+        else:
+            color = (100, 120, 200)
+        return color
+
