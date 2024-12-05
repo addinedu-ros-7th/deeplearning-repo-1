@@ -17,17 +17,9 @@ class MainWindow(QMainWindow, form_class):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
+        self.setCamThreads()
 
         self.duration = 0
-
-        self.faceCam = Camera()
-        self.daemon = True
-        self.faceCam.update.connect(self.updateFaceCam)
-
-        self.legCam = Camera()
-        self.daemon = True
-        self.legCam.update.connect(self.updateLegCam)
-
         self.athentified = False
 
         self.ath_model = FaceRecognitionModel() # face athentification model
@@ -38,8 +30,18 @@ class MainWindow(QMainWindow, form_class):
         self.setLabelCams()
         self.cameraOn()
 
+        #for testing
         self.btnSend.clicked.connect(self.sendData)
         self.lineEdit.returnPressed.connect(self.sendData)
+
+    def setCamThreads(self):
+        self.faceCam = Camera()
+        self.daemon = True
+        self.faceCam.update.connect(self.updateFaceCam)
+
+        self.legCam = Camera()
+        self.daemon = True
+        self.legCam.update.connect(self.updateLegCam)
     
     def setLabelCams(self):
         self.width, self.height = self.labelFace.width(), self.labelFace.height()
@@ -68,6 +70,9 @@ class MainWindow(QMainWindow, form_class):
         # print("CASS_leg said : ", response)
 
     def setUserImage(self):
+        '''
+        TODO:needkk to create user image
+        '''
         self.path = "../../../test/data/face/my_img/soyoung.png"
         self.name = "soyoung"
 
@@ -91,9 +96,11 @@ class MainWindow(QMainWindow, form_class):
             self.legCam.start()
             self.legCam.isRunning = True
             self.legVideo = cv2.VideoCapture(2)
-            pass
 
     def legCamOn(self):
+        '''
+        in case not using face_recognition
+        '''
         self.labelFace.hide()
         self.legCam.start()
         self.legCam.isRunning = True
@@ -148,38 +155,48 @@ class MainWindow(QMainWindow, form_class):
             self.facePixmap = self.facePixmap.scaled(self.width, self.height)
             self.labelFace.setPixmap(self.facePixmap)
 
-    # def objectDetection(self, frame):
-    #     class_names = []
-    #     widths = []
-    #     boxes = []  # 추가: 각 바운딩 박스 좌표 저장
-    #     for result in results[0].boxes:
-    #         x1, y1, x2, y2 = map(int, result.xyxy[0].tolist())
-    #         confidence = result.conf[0]
-    #         class_id = int(result.cls[0])
-    #         label = f"{names[class_id]}: {confidence:.2f}"
+    def objectDetection(self, results, frame):
+        class_names = []
+        widths = []
+        boxes = []  
+        for result in results[0].boxes:
+            x1, y1, x2, y2 = map(int, result.xyxy[0].tolist())
+            confidence = result.conf[0]
+            class_id = int(result.cls[0])
+            label = f"{self.detect_model.names[class_id]}: {confidence:.2f}"
 
-    #         # 바운딩 박스 및 레이블 그리기
-    #         cv2.rectangle(image, (x1, y1), (x2, y2), color_finder(names[class_id]), 2)
-    #         cv2.putText(image, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.0, color_finder(names[class_id]), 2)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), self.detect_model.color_finder(self.detect_model.names[class_id]), 2)
+            cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.0, self.detect_model.color_finder(self.detect_model.names[class_id]), 2)
 
-    #         ref_image_width = x2 - x1
-    #         #print("폭:", ref_image_width)
-    #         class_names.append(names[class_id])
-    #         widths.append(ref_image_width)
-    #         boxes.append((x1, y1, x2, y2))  # 바운딩 박스 좌표 저장
+            ref_image_width = x2 - x1
+            class_names.append(self.detect_model.names[class_id])
+            widths.append(ref_image_width)
+            boxes.append((x1, y1, x2, y2))
 
-    #     return class_names, widths, boxes
+        return class_names, widths, boxes
 
     def updateLegCam(self):
         ret, self.frame = self.legVideo.read()
         
         if ret:
-            frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
-
-            '''TODO: send output frame on model'''
-
+            # frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
+            frame = self.frame.copy()
             h, w, c = frame.shape
-            qImg = QImage(frame, w, h, w*c, QImage.Format_RGB888)
+
+            new_matrix, _ = cv2.getOptimalNewCameraMatrix(self.detect_model.mtx, self.detect_model.dist, (w, h), 1, (w, h))
+            calibrated_frame = cv2.undistort(frame, self.detect_model.mtx, self.detect_model.dist, new_matrix)
+            frame_results = self.detect_model.model.predict(calibrated_frame, conf=0.55, verbose=False)
+            focal_length_found = 5.
+            '''TODO: need to change focal_length_found data'''
+
+            class_names, widths, boxes = self.detect_model.pixel_width_data(frame_results, calibrated_frame)
+
+            for name, width, (x1, y1, x2, y2) in zip(class_names, widths, boxes):
+                if name in self.detect_model.known_widths:
+                    distance = self.detect_model.distance_finder(focal_length_found, self.detect_model.known_widths[name], width) - 16
+                    cv2.putText(calibrated_frame, f"{round(distance, 2)} cm", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, self.detect_model.color_finder(name), 2)
+
+            qImg = QImage(calibrated_frame, w, h, w*c, QImage.Format_RGB888)
             self.legPixmap = self.legPixmap.fromImage(qImg)
             self.legPixmap = self.legPixmap.scaled(self.w, self.h)
             self.labelLegCam.setPixmap(self.legPixmap)

@@ -142,6 +142,7 @@ class ObjectDetectionModel(nn.Module):
         super().__init__()
         self.model_path = '/home/yoon/ws/yolov8/train5/weights/best.pt'
         self.model = YOLO(self.model_path)
+        self.names = self.model.model.names
 
         self.known_widths = {
                                 'person' : 5.54,
