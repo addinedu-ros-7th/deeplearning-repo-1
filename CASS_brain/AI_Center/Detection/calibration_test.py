@@ -89,19 +89,19 @@ while True:
     calibrated_frame = cv2.undistort(frame, mtx, dist, new_matrix)
 
     # YOLO 예측
-    frame_results = model.predict(frame, conf=0.55, verbose=False)
+    frame_results = model.predict(calibrated_frame, conf=0.55, verbose=False)
         
-    width_in_frame = pixel_width_data(frame_results, frame)
+    width_in_frame = pixel_width_data(frame_results, calibrated_frame)
 
     # 거리 계산 및 표시
     if width_in_frame:
         distance = distance_finder(focal_length_found, KNOWN_WIDTH, width_in_frame)
         cv2.putText(
-            frame, f"Distance = {round(distance, 2)} cm", (50, 50), fonts, 1, BLACK, 2
+            calibrated_frame, f"Distance = {round(distance, 2)} cm", (50, 50), fonts, 1, BLACK, 2
         )
 
     # 결과 표시
-    cv2.imshow("frame", frame)
+    cv2.imshow("frame", calibrated_frame)
     if cv2.waitKey(1) == ord("q"):
         break
 
