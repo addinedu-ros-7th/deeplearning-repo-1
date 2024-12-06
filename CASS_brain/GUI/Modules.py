@@ -140,7 +140,7 @@ class FaceRecognitionModel():
 class ObjectDetectionModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.model_path = '/home/yoon/ws/yolov8/train5/weights/best.pt'
+        self.model_path = '../../../test/data/face/best.pt'
         self.model = YOLO(self.model_path)
         self.names = self.model.model.names
 
@@ -160,14 +160,14 @@ class ObjectDetectionModel(nn.Module):
         self.KNOWN_WIDTH = 5.54  # cm, 피규어 실제 너비
         self.KNOWN_DISTANCE = 29.9  # cm, 참조 거리
 
-    def focal_length(measured_distance, real_width, width_in_rf_image):
+    def focal_length(self, measured_distance, real_width, width_in_rf_image):
         return (width_in_rf_image * measured_distance) / real_width
 
 # 거리 계산 함수
-    def distance_finder(focal_length, real_width, width_in_frame):
+    def distance_finder(self, focal_length, real_width, width_in_frame):
         return (real_width * focal_length) / width_in_frame
 
-    def color_finder(name):
+    def color_finder(self, name:str):
         if name == 'red_light':
             color = (0, 0, 255)
         elif name == 'green_light':

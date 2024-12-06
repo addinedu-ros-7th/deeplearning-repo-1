@@ -6,6 +6,7 @@ from Modules import *
 import cv2
 import sys
 import socket
+from datetime import datetime
 
 form_class = uic.loadUiType("CASS_ui.ui")[0]
 
@@ -21,6 +22,8 @@ class MainWindow(QMainWindow, form_class):
 
         self.duration = 0
         self.athentified = False
+
+        self.stopFlag = False
 
         self.ath_model = FaceRecognitionModel() # face athentification model
         self.setUserImage()
@@ -54,20 +57,27 @@ class MainWindow(QMainWindow, form_class):
         self.msg_list = []
 
     def addMsg(self, msg):
-        self.msg_list.append(msg)
+        if len(msg) == 1:
+            self.msg_list.append(msg)
+        elif len(msg) > 1:
+            self.msg_list.extend(msg)
 
     def sendData(self):
         message = self.lineEdit.text()
         '''
         TODO: need to solve error triggerd by "\msg\n"
         '''
-        print(message)
         msg = message.encode()
-        # client_socket.send(msg)
-        print(msg)
-        # print("CASS_brain said : ", msg)
-        # response = client_socket.recv(1024)
-        # print("CASS_leg said : ", response)
+        client_socket.send(msg)
+        print("CASS_brain said : ", msg)
+        response = client_socket.recv(1024)
+        print("CASS_leg said : ", response)
+
+    def sendMsg(self):
+        message = self.msg_list
+        msg = f"{'&&'.join(message)}".encode('utf-8')
+        client_socket.send(msg)
+        print("CASS_brain said : ", msg)
 
     def setUserImage(self):
         '''
@@ -123,14 +133,25 @@ class MainWindow(QMainWindow, form_class):
                 if self.duration > 3 and self.duration < 4:
                     self.athentified = True
                     QMessageBox.warning(self, "Authentification ", f"{self.name} Driver Authentification Success.")
-                    message = "connect"
+                    message = "soyoung"
                     msg = message.encode()
-                    client_socket.connect((ESP32_IP, ESP32_PORT))
-                    client_socket.send(msg)
-                    print("CASS_brain said : ", msg)
-                    response = client_socket.recv(1024) 
-                    print("CASS_leg said : ", response)
+                    try:
+                        client_socket.connect((ESP32_IP, ESP32_PORT))
+                        client_socket.send(msg)
+                        print("CASS_brain said : ", msg)
+                        response = client_socket.recv(1024)
+                        print("CASS_leg said : ", response)
+                    except(ConnectionRefusedError):
+                        print("connection refused")
+                        self.authentified = False
+                        
+
+                    # self.msgMaker()
+                    # # msg = ["connect", self.name, "hi", str(datetime.now())]
+                    # self.addMsg(msg)
+                    # self.sendMsg()
                     self.labelFace.hide()
+                    self.cameraOn()
 
     def updateFaceCam(self):
         ret, face_frame = self.faceVideo.read()
@@ -142,8 +163,10 @@ class MainWindow(QMainWindow, form_class):
             self.end = time.time()
             self.duration = self.end - self.start
 
-            self.authentification(frame)
+            if self.athentified == False:
+                self.authentification(frame)
             
+            # else:
             # self.DrowsyDetection(frame)
             
             # if self.isDrowsy1 != self.isDrowsy2:
@@ -159,17 +182,23 @@ class MainWindow(QMainWindow, form_class):
         class_names = []
         widths = []
         boxes = []  
+
         for result in results[0].boxes:
             x1, y1, x2, y2 = map(int, result.xyxy[0].tolist())
             confidence = result.conf[0]
             class_id = int(result.cls[0])
-            label = f"{self.detect_model.names[class_id]}: {confidence:.2f}"
+            obj = self.detect_model.names[class_id]
+            label = f"{obj}: {confidence:.2f}"
+            color_class = self.detect_model.color_finder(obj)
 
-            cv2.rectangle(frame, (x1, y1), (x2, y2), self.detect_model.color_finder(self.detect_model.names[class_id]), 2)
-            cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.0, self.detect_model.color_finder(self.detect_model.names[class_id]), 2)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), 
+                          color_class, 2)
+            cv2.putText(frame, label, (x1, y1 - 10), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, 
+                        color_class, 2)
 
             ref_image_width = x2 - x1
-            class_names.append(self.detect_model.names[class_id])
+            class_names.append(obj)
             widths.append(ref_image_width)
             boxes.append((x1, y1, x2, y2))
 
@@ -179,24 +208,59 @@ class MainWindow(QMainWindow, form_class):
         ret, self.frame = self.legVideo.read()
         
         if ret:
-            # frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
             frame = self.frame.copy()
             h, w, c = frame.shape
+            mtx = self.detect_model.mtx
+            dist = self.detect_model.dist
+            known_widths = self.detect_model.known_widths
 
-            new_matrix, _ = cv2.getOptimalNewCameraMatrix(self.detect_model.mtx, self.detect_model.dist, (w, h), 1, (w, h))
-            calibrated_frame = cv2.undistort(frame, self.detect_model.mtx, self.detect_model.dist, new_matrix)
-            frame_results = self.detect_model.model.predict(calibrated_frame, conf=0.55, verbose=False)
-            focal_length_found = 5.
+            new_matrix, _ = cv2.getOptimalNewCameraMatrix(mtx, 
+                                                          dist, 
+                                                          (w, h), 1, (w, h))
+            calibrated_frame = cv2.undistort(frame, 
+                                             mtx, 
+                                             dist, 
+                                             new_matrix)
+            frame_results = self.detect_model.model.predict(calibrated_frame, 
+                                                            conf=0.55, verbose=False)
+            focal_length_found = 520.925
+
             '''TODO: need to change focal_length_found data'''
 
-            class_names, widths, boxes = self.detect_model.pixel_width_data(frame_results, calibrated_frame)
+            class_names, widths, boxes = self.objectDetection(frame_results, calibrated_frame)
 
             for name, width, (x1, y1, x2, y2) in zip(class_names, widths, boxes):
-                if name in self.detect_model.known_widths:
-                    distance = self.detect_model.distance_finder(focal_length_found, self.detect_model.known_widths[name], width) - 16
-                    cv2.putText(calibrated_frame, f"{round(distance, 2)} cm", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 1.0, self.detect_model.color_finder(name), 2)
+                if name in known_widths:
+                    distance = self.detect_model.distance_finder(focal_length_found, 
+                                                                 known_widths[name], 
+                                                                 width) - 16
+                    cv2.putText(calibrated_frame, f"{round(distance, 2)} cm", (x1, y2 + 20), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.0, 
+                                self.detect_model.color_finder(name), 2)
+                    
+                    # self.msgMaker()
+                    # msg = ["class", name, "distance",str(distance)]
+                    # self.addMsg(msg)
+                    # self.sendMsg()
 
-            qImg = QImage(calibrated_frame, w, h, w*c, QImage.Format_RGB888)
+                    if name == "person" and distance < 10 and self.stopFlag == False:
+                        msg = "stop"
+                        client_socket.send(msg.encode())
+                        self.stopFalg = True
+                        print("CASS_brain said : ", msg)
+                        response = client_socket.recv(1024)
+                        print("CASS_leg said : ", response)
+                    else:
+                        msg = "d"
+                        client_socket.send(msg.encode())
+                        self.stopFalg = False
+                        print("CASS_brain said : ", msg)
+                        response = client_socket.recv(1024)
+                        print("CASS_leg said : ", response)
+                        
+
+            cvt_color_frame = cv2.cvtColor(calibrated_frame, cv2.COLOR_BGR2RGB)
+            qImg = QImage(cvt_color_frame, w, h, w*c, QImage.Format_RGB888)
             self.legPixmap = self.legPixmap.fromImage(qImg)
             self.legPixmap = self.legPixmap.scaled(self.w, self.h)
             self.labelLegCam.setPixmap(self.legPixmap)
