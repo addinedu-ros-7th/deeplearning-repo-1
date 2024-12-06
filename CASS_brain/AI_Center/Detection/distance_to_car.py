@@ -64,16 +64,15 @@ def color_finder(name):
 
 # 바운딩 박스 폭 계산 함수
 def pixel_width_data(results, image):
-    class_names = []
-    widths = []
-    boxes = []  # 추가: 각 바운딩 박스 좌표 저장
+    class_names = []  # object 이름
+    widths = []  # 바운딩 박스 폭 or 높이
+    boxes = []  # 바운딩 박스 좌표
     for result in results[0].boxes:
         x1, y1, x2, y2 = map(int, result.xyxy[0].tolist())
         confidence = result.conf[0]
         cls_id = int(result.cls[0])
         cls_name = names[cls_id]
         label = f"{cls_name}: {confidence:.2f}"
-        #label = f"conf : {confidence:.2f}"
 
         # 바운딩 박스 및 레이블 그리기
         cv2.rectangle(image, (x1, y1), (x2, y2), color_finder(cls_name), 2)
@@ -86,7 +85,6 @@ def pixel_width_data(results, image):
         else:
             ref_image_width = x2 - x1
 
-        #print("폭:", ref_image_width)
         class_names.append(cls_name)
         widths.append(ref_image_width)
         boxes.append((x1, y1, x2, y2))  # 바운딩 박스 좌표 저장
@@ -111,7 +109,6 @@ else:
 focal_length_found = focal_length(KNOWN_DISTANCE, KNOWN_WIDTH, 105)
 print("focal length:", focal_length_found)
 
-# 실시간 거리 측정
 cap = cv2.VideoCapture('/home/yoon/ws/yolov8/data/video_file/test3.avi')
 #cap = cv2.VideoCapture(0)
 
@@ -139,7 +136,6 @@ while True:
 
     for name, width, (x1, y1, x2, y2) in zip(class_names, widths, boxes):
         if name in known_widths:  # 초록불, 빨간불
-            # 자동차 길이 빼서 보정
             distance = distance_finder(focal_length_found, known_widths[name], width) - 16
             #cv2.putText(calibrated_frame, f"{name} : {round(distance, 2)} cm", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_finder(name), 2)
         elif name in known_heights:
