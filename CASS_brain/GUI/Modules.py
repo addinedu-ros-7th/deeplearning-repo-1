@@ -1,4 +1,5 @@
 import os
+import cv2
 import time
 import timm
 import face_recognition
@@ -38,7 +39,7 @@ class Arduino(QThread):
         super().__init__()
         self.main = parent
         self.client_socket = None
-        self.esp32_ip = '192.168.199.119'  # ESP32의 IP 주소
+        self.esp32_ip = '172.20.10.8'  # ESP32의 IP 주소
         self.esp32_port = 8080  # ESP32에서 설정한 포트
 
     def run(self):
@@ -136,12 +137,19 @@ class FaceRecognitionModel():
                 face_locations = 0
 
         return face_locations, face_names
-    
+
+    def draw_boxes(self, frame, face_locations, face_names):
+        for (top, right, bottom, left), name in zip(face_locations, face_names):
+                    cv2.rectangle(frame, (left - 10, top - 10), (right + 10, bottom + 10), (200, 100, 5), 2)
+                    cv2.rectangle(frame, (left - 10, bottom - 25), (right + 10, bottom + 10), (200, 100, 5), cv2.FILLED)
+                    font = cv2.FONT_HERSHEY_DUPLEX
+                    cv2.putText(frame, name, (left + 6, bottom - 6), font, .5, (255, 255, 255), 1)
+              
 class ObjectDetectionModel(nn.Module):
     def __init__(self):
         super().__init__()
-        self.model_path = '../../../test/data/face/best.pt'
-        self.model = YOLO(self.model_path)
+        model_path = '../../../test/data/face/best.pt'
+        self.model = YOLO(model_path)
         self.names = self.model.model.names
 
         self.known_widths = {
@@ -149,6 +157,12 @@ class ObjectDetectionModel(nn.Module):
                                 'red_light' : 8.99,
                                 'green_light' : 8.99,
                                 'goat' : 9.89
+                            }
+
+        self.known_heights = {
+                                'person' : 12.12,
+                                'goat' : 8.59,
+                                'obstacle' : 10.48
                             }
         
         self.mtx = np.array([[     672.52,           0,      330.84],
@@ -180,3 +194,257 @@ class ObjectDetectionModel(nn.Module):
             color = (100, 120, 200)
         return color
 
+    def objectDetection(self, results, frame):
+        class_names = []
+        widths = []
+        boxes = []  
+
+        for result in results[0].boxes:
+            x1, y1, x2, y2 = map(int, result.xyxy[0].tolist())
+            confidence = result.conf[0]
+            class_id = int(result.cls[0])
+            obj = self.names[class_id]
+            label = f"{obj}: {confidence:.2f}"
+            color_class = self.color_finder(obj)
+
+            cv2.rectangle(frame, (x1, y1), (x2, y2), 
+                          color_class, 2)
+            cv2.putText(frame, label, (x1, y1 - 10), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.0, 
+                        color_class, 2)
+
+            ref_image_width = x2 - x1
+            class_names.append(obj)
+            widths.append(ref_image_width)
+            boxes.append((x1, y1, x2, y2))
+
+        return class_names, widths, boxes
+
+    def get_distance(self, frame):
+            h, w = frame.shape[:2]
+            focal_length_found = 520.925
+            new_matrix, _ = cv2.getOptimalNewCameraMatrix(self.mtx, self.dist, (w, h), 1, (w, h))
+
+            # 왜곡 계수 보정
+            calibrated_frame = cv2.undistort(frame, self.mtx, self.dist, new_matrix)
+
+            # YOLO 예측
+            frame_results = self.model.predict(calibrated_frame, conf=0.55, verbose=False)
+                
+            class_names, widths, boxes = self.objectDetection(frame_results, calibrated_frame)
+
+            for name, width, (x1, y1, x2, y2) in zip(class_names, widths, boxes):
+                if name in self.known_widths:  # 초록불, 빨간불
+                    distance = self.distance_finder(focal_length_found, self.known_widths[name], width) - 16
+                elif name in self.known_heights:
+                    distance = self.distance_finder(focal_length_found, self.known_heights[name], width) - 16
+                else:
+                    continue
+
+                cv2.putText(calibrated_frame, f"{name} : {round(distance, 2)} cm", 
+                (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, self.color_finder(name), 2)
+            
+            return calibrated_frame
+
+class LaneSegmentation(nn.Module):
+    def __init__(self):
+        super(LaneSegmentation, self).__init__()
+        model_path = "../../../test/data/face/lane_best.pt"
+        self.model = YOLO(model_path)
+
+    def forward(self, x, direction='stright'):
+        try:
+            output = self.model(x, verbose=False, device=0)
+            frame = output[0].orig_img
+
+            cls = output[0].boxes.cls
+            img_size = output[0].masks.orig_shape
+            mask = torch.zeros((img_size[0], img_size[1], 3)).cuda()
+            for i, data in enumerate(output[0].masks.data):
+                if cls[i]%2 == 0:
+                    mask[:,:,0][data==1] = 100
+                else:
+                    mask[:,:,1][data==1] = 100
+            mask = mask.detach().cpu()
+            # cv2.imshow('mask', mask.numpy())
+            
+            mid_ = int(img_size[1]/2)
+            bot_ = img_size[0]
+            start_point = (mid_, bot_)
+
+            pos1 = {
+                'curve'   : {'left':[], 'right':[],},
+                'stright' : {'left':[], 'right':[],}
+            }
+            pos2 = {'left':[], 'right':[]}
+            const = 300
+            for idx, xy in enumerate(output[0].masks.xy):
+                xy[:,1][xy[:,1]<const]= 0
+                xy[:,0][xy[:,1]==0] = 0
+                l = len(xy[:,1][xy[:,1]>=const])
+                y_pts = xy[:,1][xy[:,1]!=0]
+                if len(y_pts) == 0:
+                    continue
+                point = (xy.sum(0)/l).astype(np.int32)
+                y_max = y_pts.max()
+                x_max = xy[:,0][xy[:,1]==y_max].mean()
+                class_ = cls[idx].item()
+                
+                x_diff = x_max - mid_
+                b_point = (x_max, y_max)
+                slope = abs((y_max - point[1])/(x_max - point[0] + 1e-6))
+                x_diff2 = b_point[0] - point[0]
+                point = np.concatenate([point, [slope]], axis=0) #point, slope, class_
+                lane_info = (point, b_point, x_diff2)
+
+                if cls[idx]%2 == 0:
+                    if class_ >= 4:
+                        pos2['left'].append(np.expand_dims(point, axis=0))
+                    else:
+                        if x_diff < 0:
+                            pos1['curve']['left'].append(lane_info)
+                        else:
+                            pos1['curve']['right'].append(lane_info)
+                else:
+                    if class_ >= 4:
+                        pos2['left'].append(np.expand_dims(point, axis=0))
+                    else:
+                        if x_diff < 0:
+                            pos1['stright']['left'].append(lane_info)
+                        else:
+                            pos1['stright']['right'].append(lane_info)
+            cnst=0.25
+            if direction == 'stright':
+                LeftRight = pos1[direction]
+                L, R = LeftRight.values()
+                if not(len(L)==0 and len(R)==0):
+
+                    for key, vals in LeftRight.items():
+                        for val in vals:
+                            points, b_point, x_diff2 = val
+                            point = points[:2]
+                            slope = points[-1]
+                            if key=='left':
+                                if slope > cnst and x_diff2 < 0:
+                                    pos2['left'].append(np.expand_dims(points, axis=0))
+                                else:
+                                    pos2['right'].append(np.expand_dims(points, axis=0))
+                            elif key=='right':
+                                if slope > cnst and x_diff2 > 0:
+                                    pos2['right'].append(np.expand_dims(points, axis=0))
+                                else:
+                                    pos2['left'].append(np.expand_dims(points, axis=0))
+                else:
+                    LeftRight = pos1['curve']
+                    for key, vals in LeftRight.items():
+                        for val in vals:
+                            points, b_point, x_diff2 = val
+                            point = points[:2]
+                            slope = points[-1]
+                            if key=='left':
+                                if slope > cnst and x_diff2 < 0:
+                                    pos2['left'].append(np.expand_dims(points, axis=0))
+                                else:
+                                    pos2['right'].append(np.expand_dims(points, axis=0))
+                            elif key=='right':
+                                if slope > cnst and x_diff2 > 0:
+                                    pos2['right'].append(np.expand_dims(points, axis=0))
+                                else:
+                                    pos2['left'].append(np.expand_dims(points, axis=0))
+            else:
+                LeftRight = pos1[direction]
+                L, R = LeftRight.values()
+
+                if not(len(L)==0 and len(R)==0):
+
+                    for key, vals in LeftRight.items():
+                        for val in vals:
+                            points, b_point, x_diff2 = val
+                            point = points[:2]
+                            slope = points[-1]
+                            if key=='left':
+                                if slope > cnst and x_diff2 < 0:
+                                    pos2['left'].append(np.expand_dims(points, axis=0))
+                                else:
+                                    pos2['right'].append(np.expand_dims(points, axis=0))
+                            elif key=='right':
+                                if slope > cnst and x_diff2 > 0:
+                                    pos2['right'].append(np.expand_dims(points, axis=0))
+                                else:
+                                    pos2['left'].append(np.expand_dims(points, axis=0))
+                else:
+                    LeftRight = pos1['stright']
+                    for key, vals in LeftRight.items():
+                        for val in vals:
+                            points, b_point, x_diff2 = val
+                            point = points[:2]
+                            slope = points[-1]
+                            if key=='left':
+                                if slope > cnst and x_diff2 < 0:
+                                    pos2['left'].append(np.expand_dims(points, axis=0))
+                                else:
+                                    pos2['right'].append(np.expand_dims(points, axis=0))
+                            elif key=='right':
+                                if slope > cnst and x_diff2 > 0:
+                                    pos2['right'].append(np.expand_dims(points, axis=0))               
+                                else:
+                                    pos2['left'].append(np.expand_dims(points, axis=0))
+            cnst_s1 = 160
+            cnst_s2 = 270
+            # 빈칸 채우기
+            if len(pos2['left'])==0:
+                rpoint = np.concatenate(pos2['right'], axis=0)
+                rpoint = rpoint[rpoint[:, 1].argmax()][:2]
+                diff = rpoint[0] - mid_
+                if direction=='stright':
+                    if diff < cnst_s1:
+                        pos2['left'].append(np.array([[5, rpoint[1]]]))
+                    elif diff > cnst_s2:
+                        pos2['left'].append(np.array([[mid_, rpoint[1]]]))
+                    else:
+                        pos2['left'].append(np.array([[img_size[1]-rpoint[0], rpoint[1]+10]]))
+                elif direction=='curve':
+                    if diff < cnst_s1:
+                        pos2['left'].append(np.array([[5, rpoint[1]]]))
+                    elif diff > cnst_s2:
+                        pos2['left'].append(np.array([[mid_, rpoint[1]]]))
+                    else:
+                        pos2['left'].append(np.array([[img_size[1]-rpoint[0], rpoint[1]]]))
+
+            elif len(pos2['right'])==0:
+                rpoint = np.concatenate(pos2['left'], axis=0)
+                rpoint = rpoint[rpoint[:, 1].argmax()][:2]
+                diff = mid_ - rpoint[0]
+                if direction=='stright':
+                    if diff < cnst_s1:
+                        pos2['right'].append(np.array([[img_size[1]-5, rpoint[1]]]))
+                    elif diff > cnst_s2:
+                        pos2['right'].append(np.array([[mid_, rpoint[1]]]))
+                    else:
+                        pos2['right'].append(np.array([[img_size[1]-rpoint[0], rpoint[1]+10]]))
+                elif direction=='curve':
+
+                    if diff < cnst_s1:
+                        pos2['right'].append(np.array([[img_size[1]-5, rpoint[1]]]))
+                    elif diff > cnst_s2:
+                        pos2['right'].append(np.array([[mid_, rpoint[1]]]))
+                    else:
+                        pos2['right'].append(np.array([[img_size[1]-rpoint[0], rpoint[1]]]))
+                
+                
+            left = np.concatenate(pos2['left'], axis=0)
+            right = np.concatenate(pos2['right'], axis=0)
+            left = left[left[:, 1].argmax()][:2]
+            right = right[right[:, 1].argmax()][:2]
+            cv2.circle(frame, (int(left[0]), int(left[1])), 10, (0, 0, 255), -1)
+            cv2.circle(frame, (int(right[0]), int(right[1])), 10, (0, 0, 255), -1)
+            center = ((left + right)/2).astype(np.int32)
+            diff_x = center[0] - mid_
+
+            cv2.arrowedLine(frame, start_point, center,
+                                color=(0, 0, 0), 
+                                thickness=5, tipLength=0.1)
+            # 방향 return 
+            return diff_x
+        except:
+            pass
