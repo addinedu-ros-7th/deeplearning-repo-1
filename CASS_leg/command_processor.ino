@@ -3,8 +3,8 @@
 // run 수신 전진 _ rev(L) = rev(R) = 150
 // stop 수신 정지 _ rev(L) = rev(R) = 0
 // reverse 수신 후진 _ rev(L) = rev(R) = 150
-// left 수신 좌회전 _ rev(L) > rev(R)
-// right 수신 우회전 _ rev(L) < rev(R)
+// l1, l2, l3 수신 좌회전 _ rev(L) > rev(R)
+// r1, r2, r3 수신 우회전 _ rev(L) < rev(R)
 
 
 #include <WiFi.h>
@@ -19,7 +19,17 @@ const char* password = "159753ff";   // 핫스팟 비밀번호
 
 const int LED = 13;
 const int BUZZER = 4;
-const int speed = 120;
+
+const int speed = 100;
+const int basic_right_speed = speed;
+const int basic_left_speed = basic_right_speed + 40;
+
+int right_speed;
+int left_speed;
+
+// int prev_right_speed;
+// int prev_left_speed;
+
 // LED, 부저 millis() 세팅
 unsigned long LED_start_time = 0;
 const unsigned long LED_DELAY_TIME = 5000;
@@ -36,20 +46,18 @@ const int motor_R_reverse = 27;  // 오른쪽 역박향 IN2
 const int motor_L_forward = 33;  // 왼쪽 정방향 IN3
 const int motor_L_reverse = 25;  // 왼쪽 역박향 IN4
 
-bool turn_right = false;
-bool turn_left = false;
+// bool Left1 = false;
+// bool Left2 = false;
+// bool Left3 = false;
+// bool Right1 = false;
+// bool Right2 = false;
+// bool Right3 = false;
 
 // 서버로부터 정보 전달받는 변수
 // const int MAX_PARTS = 4;
 // String data[MAX_PARTS];
 // int splitCount = 0;
 
-// 차륜 회전속도 조절용 변수
-int speed_change_count = 0;
-int left_speed;
-int prev_left_speed;
-int right_speed;
-int prev_right_speed;
 
 // 속도 출력용 변수
 int show_speed = 0;
@@ -134,7 +142,6 @@ void LED_startTimer()
 
   void STOP()
   {
-
       left_speed = 0;
       right_speed = 0;
       analogWrite(motor_R_forward, right_speed);
@@ -144,80 +151,46 @@ void LED_startTimer()
       analogWrite(motor_L_reverse, left_speed);
   }
 
-  void TURN_RIGHT(int prev_left_speed)
+  void R1(int prev_right_speed, int prev_left_speed)
+  {
+    left_speed = prev_left_speed + 40;
+    right_speed = prev_right_speed;
+
+    GO_FORWARD();
+  }
+    void R2(int prev_right_speed, int prev_left_speed)
   {
     left_speed = prev_left_speed + 60;
-    // 가속 후 복귀
-    // if (speed_change_count >= 0 && speed_change_count < 20)
-    // {
-    //   left_speed += 4;
-    //   // right_speed -= 2;
-    //   speed_change_count ++;
-    // }
-    // else if (speed_change_count >= 20 && speed_change_count < 40)
-    // {
-    //   left_speed -= 4;
-    //   // right_speed += 2;
-    //   speed_change_count ++;
-    // }
-    // if (speed_change_count >= 40)
-    // {
-    //   speed_change_count = 0;
-    //   turn_right = false;
-    // }
-//==========================================================
-//  가속 후 복귀 X 
-    // if (speed_change_count >= 0 && speed_change_count <=15) 
-    // {
-    //   right_speed += 2;
-    //   left_speed -= 2;
-    //   speed_change_count ++;
-    // }
-    // else
-    // {
-    //   speed_change_count = 0;
-    //   turn_right = false;
-    // }
-
+    right_speed = prev_right_speed;
+    GO_FORWARD();
+  }
+    void R3(int prev_right_speed, int prev_left_speed)
+  {
+    left_speed = prev_left_speed + 80;
+    right_speed = prev_right_speed;
     GO_FORWARD();
   }
       
   
 
-  void TURN_LEFT(int prev_right_speed)
+  void L1(int prev_right_speed, int prev_left_speed)
   {
-    right_speed = prev_right_speed + 60;
-    // 가속 후 복귀
-    // if (speed_change_count >= 0 && speed_change_count < 20)
-    // {
-    //   // left_speed -= 2;
-    //   right_speed += 4;
-    //   speed_change_count ++;
-    // }
-    // else if (speed_change_count >= 20 && speed_change_count < 40)
-    // {
-    //   // left_speed += 2;
-    //   right_speed -= 4;
-    //   speed_change_count ++;
-    // }
-    // if (speed_change_count >= 40)
-    // {
-    //   speed_change_count = 0;
-    //   turn_left = false;
-    // }
-//======================================================================
-// 가속 후 복귀X
-    // if (speed_change_count >= 0 && speed_change_count <=15) 
-    // {
-    //   right_speed -= 2;
-    //   left_speed += 2;
-    //   speed_change_count ++;
-    // }
-    // else
-    // {
-    //   speed_change_count = 0;
-    //   turn_left = false;
-    // }
+    right_speed = prev_right_speed + 80;
+    left_speed = prev_left_speed - 20;
+
+    GO_FORWARD();
+  }
+  void L2(int prev_right_speed, int prev_left_speed)
+  {
+    right_speed = prev_right_speed + 100;
+    left_speed = prev_left_speed - 20;
+
+    GO_FORWARD();
+  }
+  void L3(int prev_right_speed, int prev_left_speed)
+  {
+    right_speed = prev_right_speed + 120;
+    left_speed = prev_left_speed - 20;
 
     GO_FORWARD();
   }
@@ -248,9 +221,9 @@ void setup() {
   Serial.println(WiFi.localIP());  // ESP32의 IP 주소 출력
 
   server.begin();  // 웹 서버 시작
-
-  right_speed = speed;
-  left_speed = right_speed+35;
+  int data;
+  right_speed = basic_right_speed;
+  left_speed = basic_left_speed;
 }
 
 void loop() {
@@ -262,38 +235,107 @@ void loop() {
     client.setTimeout(20);
     String data = client.readStringUntil('\n'); // 줄바꿈("\n") 기준으로 데이터 읽기 
     data.trim(); // 데이터 앞뒤 공백 제거
-    // if (receivedData != 0)
-    // {
-    //   splitString(receivedData, "&&", data, splitCount);
-    // }
-    // else
-    // {
-    //   Serial.println(receivedData);
-    // }
 
-    if (data != 0)
-    {
-      Serial.println(data);
-    }
-    delay(50);
+    switch (data.toInt()) {
+      int prev_right_speed;
+      int prev_left_speed;
 
-    if (data == "connect")
-    {
-      client.println("connected");
-    }
+      case 0: // 연결 확인
+        client.println("connected");
+        break;
+      
+      case 1: // 차주 인식
+        client.println("welcome soyoung");
+        RED_ON = true;
+        LED_startTimer();
+        break;
 
-    // LED 및 부저 작동
-    if (data == "soyoung")
-    {
-      RED_ON = true;
-      LED_startTimer();
-      client.println("welcome soyoung");
-    }
-    if (data == "person")
-    {
-      BUZZER_startTimer();
-      BUZZER_ON = true;
-      client.println("person detected");
+      case 2: // 전진
+        client.println("drive");
+        left_speed = basic_left_speed;
+        right_speed = basic_right_speed;
+
+        GO_FORWARD();
+        break;
+
+      case 3: // 정지
+        client.println("stop");
+        BUZZER_ON = true;
+        BUZZER_startTimer();
+        STOP();
+        break;
+
+      case 4: // 후진
+        client.println("reverse");
+        left_speed = basic_left_speed;
+        right_speed = basic_right_speed;
+        Go_BACK();
+        break;
+      
+      case 5: // L1
+        client.println("L1");
+        left_speed = basic_left_speed;
+        right_speed = basic_right_speed;
+
+        prev_right_speed = right_speed;
+        prev_left_speed = left_speed;
+        L1(prev_right_speed, prev_left_speed);
+        
+        break;
+      
+      case 6: // L2
+        client.println("L2");
+        left_speed = basic_left_speed;
+        right_speed = basic_right_speed;
+
+        prev_right_speed = right_speed;
+        prev_left_speed = left_speed;
+
+        L2(prev_right_speed, prev_left_speed);
+        break;
+
+      case 7: // L3
+        client.println("L3");
+        left_speed = basic_left_speed;
+        right_speed = basic_right_speed;
+
+        prev_right_speed = right_speed;
+        prev_left_speed = left_speed;
+        L3(prev_right_speed, prev_left_speed);
+        break;
+
+      case 8: // R1
+        client.println("R1");
+        left_speed = basic_left_speed;
+        right_speed = basic_right_speed;
+        
+        prev_left_speed = left_speed;
+        prev_right_speed = right_speed;
+
+        R1(prev_right_speed, prev_left_speed);
+        break;
+
+      case 9: // R2
+        client.println("R2");
+        left_speed = basic_left_speed;
+        right_speed = basic_right_speed;
+
+        prev_left_speed = left_speed;
+        prev_right_speed = right_speed;
+        R2(prev_right_speed, prev_left_speed);
+        break;
+      
+      case 10: // R3
+        client.println("R3");
+        left_speed = basic_left_speed;
+        right_speed = basic_right_speed;
+
+        prev_left_speed = left_speed;
+        prev_right_speed = right_speed;
+
+        R3(prev_right_speed, prev_left_speed);
+        break;
+
     }
 
     //LED 및 부저 작동함수
@@ -315,115 +357,19 @@ void loop() {
       tone(BUZZER, 0);
     }
 
-    // 모터 작동
 
-    // 전진
-    if (data == "d")
+    if (show_speed == 10)
     {
-      client.println("drive");
-      left_speed = 0;
-      right_speed = 0;
-      GO_FORWARD();
-      Serial.print("drive");
-      right_speed = speed;
-      left_speed = speed + 35;
-      GO_FORWARD();
-    }
-
-    // 후진
-    else if (data == "r")
-    {
-      client.println("reverse");
-      left_speed = 0;
-      right_speed = 0;
-      Go_BACK();
-
-      Serial.print("reverse");
-      right_speed = speed;
-      left_speed = right_speed+35;
-      
-      Go_BACK();
+    Serial.println("-----------------------------");
+    Serial.print("좌측륜 속도: ");
+    Serial.print(left_speed);
+    Serial.print(", ");
+    Serial.print("우측륜 속도: ");
+    Serial.println(right_speed);
+    Serial.println("-----------------------------");
+    show_speed = 0;
     }
     
-    // 정지
-    else if (data== "stop")
-    {
-      client.println("stop");
-      turn_right = false;
-      turn_left = false;
-      Serial.print("stop");
-      STOP();
-    }
 
-    // 좌회전
-    else if (data == "tl")
-    {
-      if (turn_right != true)
-      {
-        prev_right_speed = right_speed;
-        turn_left = true;
-      }
-      else
-      {
-        turn_left = false;
-      }
-    }
-
-    // 우회전
-    else if (data == "tr")
-    {
-      if (turn_left != true)
-      {
-        prev_left_speed = left_speed;
-        turn_right = true;
-      }
-      else
-      {
-        turn_right = false;
-      }
-    }
-
-
-    else if (data == "up")
-    {
-      left_speed += 10;
-      right_speed += 10;
-      GO_FORWARD();
-    }
-
-    else if (data == "down")
-    {
-      left_speed -= 10;
-      right_speed -= 10;
-      GO_FORWARD();
-    }
-
-    // if (show_speed == 10)
-    // {
-    // Serial.println("-----------------------------");
-    // Serial.print("좌측륜 속도: ");
-    // Serial.print(left_speed);
-    // Serial.print(", ");
-    // Serial.print("우측륜 속도: ");
-    // Serial.println(right_speed);
-    // Serial.println("-----------------------------");
-    // show_speed = 0;
-    // }
-    
-    if (turn_right == true)
-    {
-      TURN_RIGHT(prev_left_speed);
-    }
-
-    if (turn_left == true)
-    {
-      TURN_LEFT(prev_right_speed);
-    }
-
-    // Serial.println(speed_change_count);
-    // Serial.print("turn_left: ");
-    // Serial.println(turn_left);
-    // Serial.print("turn_right: ");
-    // Serial.println(turn_right);
   }
 }
