@@ -8,12 +8,9 @@ names = model.model.names
 
 # 실제 객체의 폭 (cm)
 known_widths = {
-    #'person' : 5.74,
     'red_light' : 8.99,
     'green_light' : 8.99,
     'cross_walk' : 3.44
-    #'goat' : 9.32,
-    #'obstacle' : 17.3
 }
 
 known_heights = {
@@ -93,28 +90,31 @@ def pixel_width_data(results, image):
     return class_names, widths, boxes 
 
 # 정지 신호 보내기
-def control_to_stop(name, distance):
+def control_to_stop(name, distance, class_names):
     order = ""
     # 멈춰야 하는 경우
     if (name == 'red_light'): 
         if (distance < 33):
             print(f"{name} : {distance}")
-            print("stop")
+            #print("stop")
             order = "Stop"
+        else:
+            if 'cross_walk' in class_names:
+                order = "Stop"
     elif (name == 'person'):
         if distance < 12:
             print(f"{name} : {distance}")
-            print("stop")
+            #print("stop")
             order = "Stop"
     elif (name == 'obstacle'):
         if distance < 15:
             print(f"{name} : {distance}")
-            print("stop")
+            #print("stop")
             order = "Avoidance"
     elif (name == 'goat'):  # goat
         if distance < 12:
             print(f"{name} : {distance}")
-            print("stop")
+            #print("stop")
             order = "Stop"
 
     return order
@@ -176,10 +176,11 @@ while True:
         else:
             continue
             
+        # 횡단 보도는 거리 표시 안함
         if not name == 'cross_walk':    
             cv2.putText(calibrated_frame, f"{distance} cm", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_finder(name), 2)
 
-        cv2.putText(calibrated_frame, control_to_stop(name, distance), (40, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 0, 255), 4)
+        cv2.putText(calibrated_frame, control_to_stop(name, distance, class_names), (40, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 0, 255), 4)
 
     # 결과 표시
     cv2.imshow("frame", calibrated_frame)
