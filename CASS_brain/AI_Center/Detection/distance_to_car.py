@@ -11,6 +11,7 @@ known_widths = {
     #'person' : 5.74,
     'red_light' : 8.99,
     'green_light' : 8.99,
+    'cross_walk' : 3.44
     #'goat' : 9.32,
     #'obstacle' : 17.3
 }
@@ -42,7 +43,7 @@ def focal_length(measured_distance, real_width, width_in_rf_image):
 
 # 거리 계산 함수
 def distance_finder(focal_length, real_width, width_in_frame):
-    return (real_width * focal_length) / width_in_frame
+    return round((real_width * focal_length) / width_in_frame - 16, 3)
 
 # bgr 기준
 def color_finder(name):
@@ -91,6 +92,33 @@ def pixel_width_data(results, image):
 
     return class_names, widths, boxes 
 
+# 정지 신호 보내기
+def control_to_stop(name, distance):
+    order = ""
+    # 멈춰야 하는 경우
+    if (name == 'red_light'): 
+        if (distance < 33):
+            print(f"{name} : {distance}")
+            print("stop")
+            order = "Stop"
+    elif (name == 'person'):
+        if distance < 12:
+            print(f"{name} : {distance}")
+            print("stop")
+            order = "Stop"
+    elif (name == 'obstacle'):
+        if distance < 15:
+            print(f"{name} : {distance}")
+            print("stop")
+            order = "Avoidance"
+    elif (name == 'goat'):  # goat
+        if distance < 12:
+            print(f"{name} : {distance}")
+            print("stop")
+            order = "Stop"
+
+    return order
+
 
 # 참조 이미지 처리
 '''ref_image = cv2.imread("/home/yoon/ws/yolov8/data/data_dl/reference_img2.png")
@@ -109,14 +137,17 @@ else:
 focal_length_found = focal_length(KNOWN_DISTANCE, KNOWN_WIDTH, 105)
 print("focal length:", focal_length_found)
 
-cap = cv2.VideoCapture('/home/yoon/ws/yolov8/data/video_file/test3.avi')
+cap = cv2.VideoCapture('/home/yoon/ws/yolov8/data/video_file/test4.avi')
 #cap = cv2.VideoCapture(0)
 
 if not cap.isOpened():
     print("no available camera")
     exit()
 
+stop_cnt = 0
+
 while True:
+    
     
     ret, frame = cap.read()
     if not ret:
@@ -131,23 +162,28 @@ while True:
 
     # YOLO 예측
     frame_results = model.predict(calibrated_frame, conf=0.55, verbose=False)
-        
+    
+    # 바운딩 박스 폭 or 높이 구하기
     class_names, widths, boxes = pixel_width_data(frame_results, calibrated_frame)
 
     for name, width, (x1, y1, x2, y2) in zip(class_names, widths, boxes):
         if name in known_widths:  # 초록불, 빨간불
-            distance = distance_finder(focal_length_found, known_widths[name], width) - 16
+            distance = distance_finder(focal_length_found, known_widths[name], width)
             #cv2.putText(calibrated_frame, f"{name} : {round(distance, 2)} cm", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_finder(name), 2)
         elif name in known_heights:
-            distance = distance_finder(focal_length_found, known_heights[name], width) - 16
+            distance = distance_finder(focal_length_found, known_heights[name], width)
             #cv2.putText(calibrated_frame, f"{name} : {round(distance, 2)} cm", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_finder(name), 2)
         else:
             continue
+            
+        if not name == 'cross_walk':    
+            cv2.putText(calibrated_frame, f"{distance} cm", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_finder(name), 2)
 
-        cv2.putText(calibrated_frame, f"{name} : {round(distance, 2)} cm", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color_finder(name), 2)
+        cv2.putText(calibrated_frame, control_to_stop(name, distance), (40, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 0, 255), 4)
+
     # 결과 표시
     cv2.imshow("frame", calibrated_frame)
-    if cv2.waitKey(1) == ord("q"):
+    if cv2.waitKey(10) == ord("q"):
         break
 
 cap.release()
