@@ -32,6 +32,82 @@ class Camera(QThread):
     def stop(self):
         self.running = False
 
+class TCP():
+    def __init__(self):
+        self.client_socket = None
+        self.esp32_ip = '172.20.10.8'  # ESP32의 IP 주소
+        self.esp32_port = 8080 
+        self.message = None
+        self.isConnected = False
+
+    def connectLeg(self):
+        print("try connecting to CASS_leg...")
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        if self.isConnected == False:
+            try:
+                self.client_socket.connect((self.esp32_ip, self.esp32_port))
+                time.sleep(0.5)
+                response = self.sendMsg("connect")
+                if type(response) == bytes:
+                    response = response.decode('utf-8')
+                if response == "connected":
+                    self.isConnected = True
+                    print("="*10, "leg has well connected", "="*10)
+                else:
+                    print("not byte not str what are you", response)
+
+            except(ConnectionRefusedError):
+                print("connection refused")
+                self.isConnected = False
+                self.connectLeg()
+        else:
+            print("CASS_leg is already connected")
+
+    def sendMsg(self, msg):
+        match(msg):
+            case "connect":
+                self.message = "11"
+            case "soyoung": # user_name
+                self.message = "21"
+            case "drive":
+                self.message = "31"
+            case "stop":
+                self.message = "32"
+            case "reverse":
+                self.message = "33"
+            case "L1":
+                self.message = "41"
+            case "L2":
+                self.message = "42"
+            case "L3":
+                self.message = "43"
+            case "R1":
+                self.message = "51"
+            case "R2":
+                self.message = "52"
+            case "R3":
+                self.message = "53"
+            case "emergency":
+                self.message = "99"
+        
+
+        self.message = self.message.encode()
+        self.client_socket.send(self.message)
+        print("CASS_brain said : ", msg)
+        time.sleep(0.5)
+        response = self.client_socket.recv(1024)
+        response = response.decode('utf-8')
+        # response = "test"
+        print("CASS_leg said : ", response)
+        print("=" * 40)
+
+        return response
+    
+    def close(self):
+        self.client_socket.close()
+
+
 class Arduino(QThread):
     distance_signal = pyqtSignal(str)  # 거리를 전달할 시그널
 
@@ -65,7 +141,6 @@ class Arduino(QThread):
     def stop(self):
         print('ESP32 Disconnected')
         self.client_socket.close()  # 시리얼 포트 닫기
-
 
 class DrowseDetectionModel(nn.Module):
     def __init__(self):        
@@ -232,6 +307,7 @@ class ObjectDetectionModel(nn.Module):
             frame_results = self.model.predict(calibrated_frame, conf=0.55, verbose=False)
                 
             class_names, widths, boxes = self.objectDetection(frame_results, calibrated_frame)
+            detect_list = []
 
             for name, width, (x1, y1, x2, y2) in zip(class_names, widths, boxes):
                 if name in self.known_widths:  # 초록불, 빨간불
@@ -243,8 +319,9 @@ class ObjectDetectionModel(nn.Module):
 
                 cv2.putText(calibrated_frame, f"{name} : {round(distance, 2)} cm", 
                 (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, self.color_finder(name), 2)
-            
-            return calibrated_frame
+                detect_list.extend([name, distance])
+
+            return detect_list
 
 class LaneSegmentation(nn.Module):
     def __init__(self):
