@@ -86,7 +86,6 @@ def pixel_width_data(results, image):
         class_names.append(cls_name)  # 클래스 이름 저장
         widths.append(ref_image_width)  # 폭 or 높이 저장
         boxes.append((x1, y1, x2, y2))  # 바운딩 박스 좌표 저장
-
     return class_names, widths, boxes 
 
 # 신호 보내기
@@ -97,23 +96,18 @@ def control_signal(name, distance, class_names):
             order = "Stop"
         else:
             if ('cross_walk' in class_names) and (distance < 50):
-                order = "Stop"
-                
+                order = "Stop"          
     elif (name == 'person'):
         if distance < 12:
             order = "Stop"
-
     elif (name == 'obstacle'):
         if distance < 15:
             order = "Avoidance"
-
     elif (name == 'goat'):
         if distance < 12:
             order = "Stop"
-
     else:
         pass
-
     return order
 
 # 참조 이미지 처리
@@ -133,7 +127,7 @@ else:
 focal_length_found = focal_length(KNOWN_DISTANCE, KNOWN_WIDTH, 105)
 print("focal length:", focal_length_found)
 
-cap = cv2.VideoCapture('/home/yoon/ws/yolov8/data/video_file/test1.avi')
+cap = cv2.VideoCapture('/home/yoon/ws/yolov8/data/video_file/test6.avi')
 # cap = cv2.VideoCapture(0)
 
 if not cap.isOpened():
@@ -151,7 +145,7 @@ while True:
     h, w = frame.shape[:2]
     new_matrix, _ = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
 
-    # 왜곡 계수 보정
+    # 카메라 영상 왜곡 계수 보정
     calibrated_frame = cv2.undistort(frame, mtx, dist, new_matrix)
 
     # YOLO 예측
@@ -185,11 +179,11 @@ while True:
         cur_order = 'Stop'
         text_color = (34, 34, 178)
     else:
-        if "Avoidance" in order_list:
+        if 'Avoidance' in order_list:
             cur_order = 'Avoidance'
             text_color = (139, 0, 0)
         else:
-            cur_order = 'Go'
+            cur_order = 'straight'
             text_color = (34, 139, 34)
 
     cv2.putText(calibrated_frame, cur_order, (40, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, text_color, 4)
