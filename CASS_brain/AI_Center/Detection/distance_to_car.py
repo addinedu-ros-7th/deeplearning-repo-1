@@ -21,11 +21,11 @@ known_heights = {
 }
 
 # 카메라 캘리브레이션 값
-mtx = np.array([[     672.52,           0,      330.84],
-                [          0,      673.15,      257.85],
-                [          0,           0,           1]])
+mtx = np.array([[672.52, 0, 330.84],
+                [0, 673.15, 257.85],
+                [0, 0, 1]])
                 
-dist = np.array([[   -0.44717,     0.63559,   0.0029907, -0.00055208,    -0.94232]])
+dist = np.array([[-0.44717, 0.63559, 0.0029907, -0.00055208, -0.94232]])
 
 # 설정값
 KNOWN_WIDTH = 6.2  # 사각형 너비 cm
@@ -33,7 +33,6 @@ KNOWN_DISTANCE = 31.1  # 실제 거리 cm
 
 '''KNOWN_WIDTH = 7.33  # cm, 피규어 실제 너비
 KNOWN_DISTANCE = 29.9  # cm, 참조 거리'''
-
 
 # focal length 계산 함수
 def focal_length(measured_distance, real_width, width_in_rf_image):
@@ -90,13 +89,11 @@ def pixel_width_data(results, image):
 
     return class_names, widths, boxes 
 
-# 정지 신호 보내기
-def control_to_stop(name, distance, class_names):
+# 신호 보내기
+def control_signal(name, distance, class_names):
     order = " "
     if (name == 'red_light'): 
         if (distance < 33):
-            #print(f"{name} : {distance}")
-            #print("stop")
             order = "Stop"
         else:
             if ('cross_walk' in class_names) and (distance < 50):
@@ -104,27 +101,20 @@ def control_to_stop(name, distance, class_names):
                 
     elif (name == 'person'):
         if distance < 12:
-            #print(f"{name} : {distance}")
-            #print("stop")
             order = "Stop"
 
     elif (name == 'obstacle'):
         if distance < 15:
-            #print(f"{name} : {distance}")
-            #print("stop")
             order = "Avoidance"
 
     elif (name == 'goat'):
         if distance < 12:
-            #print(f"{name} : {distance}")
-            #print("stop")
             order = "Stop"
 
     else:
         pass
 
     return order
-
 
 # 참조 이미지 처리
 '''ref_image = cv2.imread("/home/yoon/ws/yolov8/data/data_dl/reference_img2.png")
@@ -143,8 +133,8 @@ else:
 focal_length_found = focal_length(KNOWN_DISTANCE, KNOWN_WIDTH, 105)
 print("focal length:", focal_length_found)
 
-cap = cv2.VideoCapture('/home/yoon/ws/yolov8/data/video_file/test6.avi')
-#cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture('/home/yoon/ws/yolov8/data/video_file/test1.avi')
+# cap = cv2.VideoCapture(0)
 
 if not cap.isOpened():
     print("no available camera")
@@ -187,20 +177,22 @@ while True:
         if not name in ['cross_walk', 'stop_line']:    
             cv2.putText(calibrated_frame, f"{distance} cm", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.57, color_finder(name), 2)
 
-        order = control_to_stop(name, distance, class_names)
+        order = control_signal(name, distance, class_names)
 
         order_list.append(order)
 
-    if "Stop" in order_list:
+    if 'Stop' in order_list:
         cur_order = 'Stop'
-        cv2.putText(calibrated_frame, "Stop", (40, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 0, 255), 4)
+        text_color = (34, 34, 178)
     else:
         if "Avoidance" in order_list:
             cur_order = 'Avoidance'
-            cv2.putText(calibrated_frame, "Avoidance", (40, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, (255, 0, 0), 4)
+            text_color = (139, 0, 0)
         else:
             cur_order = 'Go'
-            cv2.putText(calibrated_frame, "Go", (40, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 255, 0), 4)
+            text_color = (34, 139, 34)
+
+    cv2.putText(calibrated_frame, cur_order, (40, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, text_color, 4)
 
     # esp 로 명령 보내기
     if prev_order != cur_order:
