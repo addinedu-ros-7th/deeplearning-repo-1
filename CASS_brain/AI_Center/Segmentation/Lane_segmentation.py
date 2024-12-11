@@ -43,18 +43,22 @@ class LaneSegmentation(nn.Module):
         output = self.model(frame, verbose=False, device=0)
         frame = output[0].orig_img
         avoid = False
+        is_side = True
         cls = output[0].boxes.cls
         img_size = output[0].masks.orig_shape
 
         mid_ = int(img_size[1]/2)
         bot_ = img_size[0]
         start_point = (mid_, bot_)
-
+        l_cnt = 0
+        r_cnt = 0
         roads = {'center':[], 'side':[]}
         for i, xy in enumerate(output[0].masks.xy):
             self.center.get_centroid(xy)
             point_x = self.center.centroid_x
             point_y = self.center.centroid_y
+            if point_x < 150 or point_x > img_size[1] - 150:
+                continue
             slope = -(start_point[0] - point_x)/(start_point[1] - point_y)
             slope = round(np.rad2deg(np.arctan(slope)))
             point = np.array([self.center.centroid_x, self.center.centroid_y, slope], dtype=np.int32)
@@ -65,9 +69,11 @@ class LaneSegmentation(nn.Module):
 
             if select_road=='left':
                 if c_name=='left_road':
+                    l_cnt += 1
                     roads['side'].append(np.expand_dims(point, axis=0))
             elif select_road=='right':
                 if c_name=='right_road':
+                    r_cnt += 1
                     roads['side'].append(np.expand_dims(point, axis=0))
         
         if select_road == 'center':
@@ -82,9 +88,13 @@ class LaneSegmentation(nn.Module):
         road = np.concatenate(road, axis=0)
         road = road[road[:, -1].argsort()]
         if direction == 'left':
+            if l_cnt==0:    
+                is_side = False
             slope = road[-1]
             road = road[0][:2]
         elif direction == 'right':
+            if r_cnt==0:
+                is_side = False
             slope = road[-1]
             road = road[-1][:2]
         else:
@@ -107,6 +117,6 @@ class LaneSegmentation(nn.Module):
                             color=(0, 0, 0), 
                             thickness=5, tipLength=0.1)
 
-        return slope[0], avoid
+        return slope[0], avoid, is_side
     
 
