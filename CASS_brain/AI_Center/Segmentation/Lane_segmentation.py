@@ -34,10 +34,15 @@ class LaneSegmentation(nn.Module):
         self.center = Centroid()
         self.N2C = {'0': 'center_road', '1': 'left_road', '2': 'right_road'}
 
-    def forward(self, frame, direction='straight', select_road='center'):
+    def is_point_in_bbox(self, point, bbox):
+        x, y = point
+        x_min, y_min, x_max, y_max = bbox
+        return x_min <= x <= x_max and y_min <= y <= y_max
+    
+    def forward(self, frame, direction='straight', select_road='center', obstackle=None):
         output = self.model(frame, verbose=False, device=0)
         frame = output[0].orig_img
-
+        avoid = False
         cls = output[0].boxes.cls
         img_size = output[0].masks.orig_shape
 
@@ -53,6 +58,7 @@ class LaneSegmentation(nn.Module):
             slope = -(start_point[0] - point_x)/(start_point[1] - point_y)
             slope = round(np.rad2deg(np.arctan(slope)))
             point = np.array([self.center.centroid_x, self.center.centroid_y, slope], dtype=np.int32)
+            
             c_name = self.N2C[str(int(cls[i].item()))]
             if c_name=='center_road':
                 roads['center'].append(np.expand_dims(point, axis=0))
@@ -93,10 +99,14 @@ class LaneSegmentation(nn.Module):
                     road = road[0][:2]
                 else:
                     road = road[0][:2]
-            
+
+        if obstackle is not None:
+            avoid = self.is_point_in_bbox(road, obstackle)
 
         cv2.arrowedLine(frame, start_point, road,
                             color=(0, 0, 0), 
                             thickness=5, tipLength=0.1)
 
-        return slope[0]
+        return slope[0], avoid
+    
+
