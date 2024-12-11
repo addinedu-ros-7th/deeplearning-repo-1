@@ -9,7 +9,7 @@ class ObjectDetection(nn.Module):
         self.model = YOLO(checkpoint_path)
         self.names = self.model.names
 
-    # 실제 객체의 폭 (cm)
+        # 실제 객체의 폭 (cm)
         self.known_widths = {
             'red_light' : 8.99,
             'green_light' : 8.99,
@@ -25,21 +25,18 @@ class ObjectDetection(nn.Module):
 
         # 카메라 캘리브레이션 값
         self.mtx = np.array([[672.52, 0, 330.84],
-                        [0, 673.15, 257.85],
-                        [0, 0, 1]])
+                             [0, 673.15, 257.85],
+                             [0, 0, 1]])
                         
         self.dist = np.array([[-0.44717, 0.63559, 0.0029907, -0.00055208, -0.94232]])
 
         # 설정값
-        self.KNOWN_WIDTH = 6.2  # 사각형 너비 cm
+        self.KNOWN_HEIGHT = 6.2  # 사각형 높이 cm
         self.KNOWN_DISTANCE = 31.1  # 실제 거리 cm
-        self.focal_length_found = self.focal_length(self.KNOWN_DISTANCE, self.KNOWN_WIDTH, 105)
+        self.focal_length_found = self.focal_length(self.KNOWN_DISTANCE, self.KNOWN_HEIGHT, 105)
 
         self.prev_order = None
         self.cur_order = None
-
-        '''KNOWN_WIDTH = 7.33  # cm, 피규어 실제 너비
-        KNOWN_DISTANCE = 29.9  # cm, 참조 거리'''
 
     # focal length 계산 함수
     def focal_length(self, measured_distance, real_width, width_in_rf_image):
@@ -49,7 +46,7 @@ class ObjectDetection(nn.Module):
     def distance_finder(self, focal_length, real_width, width_in_frame):
         return round((real_width * focal_length) / width_in_frame - 16, 3)
 
-# bgr 기준
+    # bgr 기준
     def color_finder(self, name):
         if name == 'red_light':
             color = (0, 0, 255)
@@ -96,8 +93,9 @@ class ObjectDetection(nn.Module):
         return class_names, widths, boxes 
 
     # 신호 보내기
-    def control_signal(self, name, distance, class_names):
-        order = " "
+    def control_signal(self, name, distance, boxes, class_names):
+        order = ""
+        pos = None
         if (name == 'red_light'): 
             if (distance < 33):
                 order = "Stop"
@@ -110,12 +108,14 @@ class ObjectDetection(nn.Module):
         elif (name == 'obstacle'):
             if distance < 15:
                 order = "Avoidance"
+                pos = boxes
         elif (name == 'goat'):
             if distance < 12:
                 order = "Stop"
         else:
             pass
-        return order
+
+        return order, pos
     
     def forward(self, frame):
         h, w = frame.shape[:2]
@@ -133,6 +133,9 @@ class ObjectDetection(nn.Module):
         # 현재 프레임에 대한 order 값
         order_list = []
 
+        # obstacle 바운딩 박스 좌표
+        obst = None
+
         for name, width, (x1, y1, x2, y2) in zip(class_names, widths, boxes):
             if name in self.known_widths:  # 초록불, 빨간불
                 distance = self.distance_finder(self.focal_length_found, 
@@ -145,12 +148,13 @@ class ObjectDetection(nn.Module):
                 
             # 횡단 보도, 정지선은 거리 표시 안함
             if not name in ['cross_walk', 'stop_line']:    
-                cv2.putText(frame, 
-                            f"{distance} cm", (x1, y2 + 20), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.57, 
-                            self.color_finder(name), 2)
+                cv2.putText(frame, f"{distance} cm", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.57, self.color_finder(name), 2)
 
-            order = self.control_signal(name, distance, class_names)
+            cls_boxes = (x1, y1, x2, y2)
+            order, obs_pos = self.control_signal(name, distance, cls_boxes, class_names)
+
+            if obs_pos != None:
+                obst = obs_pos
 
             order_list.append(order)
 
@@ -172,4 +176,4 @@ class ObjectDetection(nn.Module):
             # print(self.cur_order)
             self.prev_order = self.cur_order    
 
-        return self.cur_order, frame
+        return self.cur_order, frame, obst

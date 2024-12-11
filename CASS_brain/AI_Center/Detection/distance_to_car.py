@@ -28,7 +28,7 @@ mtx = np.array([[672.52, 0, 330.84],
 dist = np.array([[-0.44717, 0.63559, 0.0029907, -0.00055208, -0.94232]])
 
 # 설정값
-KNOWN_WIDTH = 6.2  # 사각형 너비 cm
+KNOWN_HEIGHT = 6.2  # 사각형 실제 높이 cm
 KNOWN_DISTANCE = 31.1  # 실제 거리 cm
 
 '''KNOWN_WIDTH = 7.33  # cm, 피규어 실제 너비
@@ -65,7 +65,7 @@ def pixel_width_data(results, image):
     class_names = []  # object 이름
     widths = []  # 바운딩 박스 폭 or 높이
     boxes = []  # 바운딩 박스 좌표
-    for result in results[0].boxes:
+    for result in results[0].boxes:  # x1, y1 은 좌측 상단 / x2, y2 는 우측 하단
         x1, y1, x2, y2 = map(int, result.xyxy[0].tolist())
         confidence = result.conf[0]
         cls_id = int(result.cls[0])
@@ -86,29 +86,34 @@ def pixel_width_data(results, image):
         class_names.append(cls_name)  # 클래스 이름 저장
         widths.append(ref_image_width)  # 폭 or 높이 저장
         boxes.append((x1, y1, x2, y2))  # 바운딩 박스 좌표 저장
+
     return class_names, widths, boxes 
 
 # 신호 보내기
-def control_signal(name, distance, class_names):
-    order = " "
+def control_signal(name, distance, boxes, class_names):
+    order = ""
+    pos = None
     if (name == 'red_light'): 
         if (distance < 33):
             order = "Stop"
         else:
             if ('cross_walk' in class_names) and (distance < 50):
-                order = "Stop"          
+                order = "Stop"
     elif (name == 'person'):
         if distance < 12:
-            order = "Stop"
+            order = "Stop"       
     elif (name == 'obstacle'):
         if distance < 15:
             order = "Avoidance"
+            pos = boxes
     elif (name == 'goat'):
         if distance < 12:
             order = "Stop"
     else:
         pass
-    return order
+    
+    return order, pos
+
 
 # 참조 이미지 처리
 '''ref_image = cv2.imread("/home/yoon/ws/yolov8/data/data_dl/reference_img2.png")
@@ -124,7 +129,7 @@ else:
     exit()'''
 
 # 초점 거리 구하기
-focal_length_found = focal_length(KNOWN_DISTANCE, KNOWN_WIDTH, 105)
+focal_length_found = focal_length(KNOWN_DISTANCE, KNOWN_HEIGHT, 104)
 print("focal length:", focal_length_found)
 
 cap = cv2.VideoCapture('/home/yoon/ws/yolov8/data/video_file/test6.avi')
@@ -145,7 +150,7 @@ while True:
     h, w = frame.shape[:2]
     new_matrix, _ = cv2.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
 
-    # 카메라 영상 왜곡 계수 보정
+    # 왜곡 계수 보정
     calibrated_frame = cv2.undistort(frame, mtx, dist, new_matrix)
 
     # YOLO 예측
@@ -153,6 +158,9 @@ while True:
     
     # 바운딩 박스 폭 or 높이 구하기
     class_names, widths, boxes = pixel_width_data(frame_results, calibrated_frame)
+
+    # obstacle 바운딩 박스 좌표
+    obst = ""
 
     # 현재 프레임에 대한 order 값
     order_list = []
@@ -171,7 +179,11 @@ while True:
         if not name in ['cross_walk', 'stop_line']:    
             cv2.putText(calibrated_frame, f"{distance} cm", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.57, color_finder(name), 2)
 
-        order = control_signal(name, distance, class_names)
+        cls_boxes = (x1, y1, x2, y2)
+        order, obs_pos = control_signal(name, distance, cls_boxes, class_names)
+
+        if obs_pos != None:
+            obst = obs_pos
 
         order_list.append(order)
 
@@ -179,7 +191,7 @@ while True:
         cur_order = 'Stop'
         text_color = (34, 34, 178)
     else:
-        if 'Avoidance' in order_list:
+        if "Avoidance" in order_list:
             cur_order = 'Avoidance'
             text_color = (139, 0, 0)
         else:
@@ -188,10 +200,15 @@ while True:
 
     cv2.putText(calibrated_frame, cur_order, (40, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, text_color, 4)
 
+    # obstacle 바운딩 박스 좌표
+    cv2.putText(calibrated_frame, str(obst), (40, 120), cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+
     # esp 로 명령 보내기
     if prev_order != cur_order:
         print(cur_order)
         prev_order = cur_order
+
+    #calibrated_frame = cv2.resize(calibrated_frame, (960, 640))
 
     # 결과 표시
     cv2.imshow("frame", calibrated_frame)
