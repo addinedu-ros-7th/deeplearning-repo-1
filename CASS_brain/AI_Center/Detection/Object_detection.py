@@ -162,7 +162,7 @@ class ObjectDetection(nn.Module):
             self.cur_order = 'stop'
             text_color = (34, 34, 178)
         else:
-            self.cur_order = 'straight'
+            self.cur_order = 'drive'
             text_color = (34, 139, 34)
 
         cv2.putText(frame, self.cur_order, (40, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, text_color, 4)
