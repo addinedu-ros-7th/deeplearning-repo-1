@@ -158,7 +158,7 @@ class ObjectDetection(nn.Module):
 
             order_list.append(order)
 
-        if 'Stop' in order_list:
+        if 'stop' in order_list:
             self.cur_order = 'stop'
             text_color = (34, 34, 178)
         else:
