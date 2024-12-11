@@ -53,11 +53,12 @@ class LaneSegmentation(nn.Module):
         l_cnt = 0
         r_cnt = 0
         roads = {'center':[], 'side':[]}
+        cnst = 100
         for i, xy in enumerate(output[0].masks.xy):
             self.center.get_centroid(xy)
             point_x = self.center.centroid_x
             point_y = self.center.centroid_y
-            if point_x < 150 or point_x > img_size[1] - 150:
+            if point_x < cnst or point_x > img_size[1] - cnst:
                 continue
             slope = -(start_point[0] - point_x)/(start_point[1] - point_y)
             slope = round(np.rad2deg(np.arctan(slope)))
@@ -84,7 +85,6 @@ class LaneSegmentation(nn.Module):
             road = roads['side']
             if len(road) == 0:
                 road = roads['center']    
-
         road = np.concatenate(road, axis=0)
         road = road[road[:, -1].argsort()]
         if direction == 'left':
