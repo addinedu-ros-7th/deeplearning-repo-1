@@ -33,7 +33,7 @@ class ObjectDetection(nn.Module):
         # 설정값
         self.KNOWN_HEIGHT = 6.2  # 사각형 높이 cm
         self.KNOWN_DISTANCE = 31.1  # 실제 거리 cm
-        self.focal_length_found = self.focal_length(self.KNOWN_DISTANCE, self.KNOWN_HEIGHT, 104)
+        self.focal_length_found = self.focal_length(self.KNOWN_DISTANCE, self.KNOWN_HEIGHT, 105)
 
         self.prev_order = None
         self.cur_order = None
@@ -64,7 +64,7 @@ class ObjectDetection(nn.Module):
             color = (100, 120, 200)
         return color
 
-    # 바운딩 박스 폭 계산 함수
+# 바운딩 박스 폭 계산 함수
     def pixel_width_data(self, results, image):
         class_names = []  # object 이름
         widths = []  # 바운딩 박스 폭 or 높이
@@ -129,12 +129,12 @@ class ObjectDetection(nn.Module):
         
         # 바운딩 박스 폭 or 높이 구하기
         class_names, widths, boxes = self.pixel_width_data(frame_results, frame)
-        
-        # obstacle 바운딩 박스 좌표
-        obst = None
 
         # 현재 프레임에 대한 order 값
         order_list = []
+
+        # obstacle 바운딩 박스 좌표
+        obst = None
 
         for name, width, (x1, y1, x2, y2) in zip(class_names, widths, boxes):
             if name in self.known_widths:  # 초록불, 빨간불
@@ -151,9 +151,10 @@ class ObjectDetection(nn.Module):
                 cv2.putText(frame, f"{distance} cm", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.57, self.color_finder(name), 2)
 
             cls_boxes = (x1, y1, x2, y2)
-            order, pos = self.control_signal(name, distance, cls_boxes, class_names)
-            if pos != None:
-                obst = pos
+            order, obs_pos = self.control_signal(name, distance, cls_boxes, class_names)
+
+            if obs_pos != None:
+                obst = obs_pos
 
             order_list.append(order)
 
