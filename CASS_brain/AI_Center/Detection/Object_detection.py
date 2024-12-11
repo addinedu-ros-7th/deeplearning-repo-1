@@ -98,20 +98,20 @@ class ObjectDetection(nn.Module):
         pos = None
         if (name == 'red_light'): 
             if (distance < 33):
-                order = "Stop"
+                order = "stop"
             else:
                 if ('cross_walk' in class_names) and (distance < 50):
-                    order = "Stop"          
+                    order = "stop"          
         elif (name == 'person'):
             if distance < 12:
-                order = "Stop"
+                order = "stop"
         elif (name == 'obstacle'):
             if distance < 15:
-                order = "straight"
+                order = "drive"
                 pos = boxes
         elif (name == 'goat'):
             if distance < 12:
-                order = "Stop"
+                order = "stop"
         else:
             pass
 
@@ -159,7 +159,7 @@ class ObjectDetection(nn.Module):
             order_list.append(order)
 
         if 'Stop' in order_list:
-            self.cur_order = 'Stop'
+            self.cur_order = 'stop'
             text_color = (34, 34, 178)
         else:
             self.cur_order = 'straight'

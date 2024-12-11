@@ -95,20 +95,20 @@ def control_signal(name, distance, boxes, class_names):
     pos = None
     if (name == 'red_light'): 
         if (distance < 33):
-            order = "Stop"
+            order = "stop"
         else:
             if ('cross_walk' in class_names) and (distance < 50):
-                order = "Stop"
+                order = "stop"
     elif (name == 'person'):
         if distance < 12:
-            order = "Stop"       
+            order = "stop"       
     elif (name == 'obstacle'):
         if distance < 15:
-            order = "straight"
+            order = "drive"
             pos = boxes
     elif (name == 'goat'):
         if distance < 12:
-            order = "Stop"
+            order = "stop"
     else:
         pass
     
@@ -188,10 +188,10 @@ while True:
         order_list.append(order)
 
     if 'Stop' in order_list:
-        cur_order = 'Stop'
+        cur_order = 'stop'
         text_color = (34, 34, 178)
     else:
-        cur_order = 'straight'
+        cur_order = 'drive'
         text_color = (34, 139, 34)
 
     cv2.putText(calibrated_frame, cur_order, (40, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, text_color, 4)
