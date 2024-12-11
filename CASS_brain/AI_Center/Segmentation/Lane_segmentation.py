@@ -34,7 +34,7 @@ class LaneSegmentation(nn.Module):
         self.center = Centroid()
         self.N2C = {'0': 'center_road', '1': 'left_road', '2': 'right_road'}
 
-    def forward(self, frame, direction='straight', mode='drive'):
+    def forward(self, frame, direction='straight', select_road='center'):
         output = self.model(frame, verbose=False, device=0)
         frame = output[0].orig_img
 
@@ -43,26 +43,28 @@ class LaneSegmentation(nn.Module):
 
         mid_ = int(img_size[1]/2)
         bot_ = img_size[0]
+        start_point = (mid_, bot_)
 
         roads = {'center':[], 'side':[]}
         for i, xy in enumerate(output[0].masks.xy):
             self.center.get_centroid(xy)
-            point = np.array([self.center.centroid_x, self.center.centroid_y], dtype=np.int32)
-            c_name = self.N2C[cls[i].item()]
+            point_x = self.center.centroid_x
+            point_y = self.center.centroid_y
+            slope = -(start_point[0] - point_x)/(start_point[1] - point_y)
+            slope = round(np.rad2deg(np.arctan(slope)))
+            point = np.array([self.center.centroid_x, self.center.centroid_y, slope], dtype=np.int32)
+            c_name = self.N2C[str(int(cls[i].item()))]
             if c_name=='center_road':
                 roads['center'].append(np.expand_dims(point, axis=0))
 
-            if mode=='left':
+            if select_road=='left':
                 if c_name=='left_road':
                     roads['side'].append(np.expand_dims(point, axis=0))
-            elif mode=='right':
+            elif select_road=='right':
                 if c_name=='right_road':
                     roads['side'].append(np.expand_dims(point, axis=0))
         
-
-        start_point = (mid_, bot_)
-
-        if mode == 'drive':
+        if select_road == 'center':
             road = roads['center']
             if len(road) == 0:
                 road = roads['side']
@@ -72,21 +74,29 @@ class LaneSegmentation(nn.Module):
                 road = roads['center']    
 
         road = np.concatenate(road, axis=0)
-        road = road[road[:, 0].argsort()]
+        road = road[road[:, -1].argsort()]
         if direction == 'left':
-            road = road[0]
+            slope = road[-1]
+            road = road[0][:2]
         elif direction == 'right':
-            road = road[-1]
+            slope = road[-1]
+            road = road[-1][:2]
         else:
             if len(road) > 2:
-                road = road[1:-1].mean(0).astype(np.int32)
+                slope = road[:,-1].mean(0)
+                road = road[1:-1][:2].mean(0).astype(np.int32)
             else:
-                road = road[0]        
+                slope = road[:,-1]
+                if slope[0] < -10:
+                    road = road[-1][:2] 
+                elif slope[-1] > 10:
+                    road = road[0][:2]
+                else:
+                    road = road[0][:2]
+            
 
         cv2.arrowedLine(frame, start_point, road,
                             color=(0, 0, 0), 
                             thickness=5, tipLength=0.1)
 
-        slope = -(start_point[0] - road[0])/(start_point[1] - road[1])
-        slope = np.rad2deg(np.arctan(slope)) 
-        return slope
+        return slope[0]
