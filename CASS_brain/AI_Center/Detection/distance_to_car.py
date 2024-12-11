@@ -104,7 +104,7 @@ def control_signal(name, distance, boxes, class_names):
             order = "Stop"       
     elif (name == 'obstacle'):
         if distance < 15:
-            order = "Avoidance"
+            order = "straight"
             pos = boxes
     elif (name == 'goat'):
         if distance < 12:
@@ -191,12 +191,8 @@ while True:
         cur_order = 'Stop'
         text_color = (34, 34, 178)
     else:
-        if "Avoidance" in order_list:
-            cur_order = 'Avoidance'
-            text_color = (139, 0, 0)
-        else:
-            cur_order = 'straight'
-            text_color = (34, 139, 34)
+        cur_order = 'straight'
+        text_color = (34, 139, 34)
 
     cv2.putText(calibrated_frame, cur_order, (40, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, text_color, 4)
 
