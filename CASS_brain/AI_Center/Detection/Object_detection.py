@@ -33,7 +33,7 @@ class ObjectDetection(nn.Module):
         # 설정값
         self.KNOWN_HEIGHT = 6.2  # 사각형 높이 cm
         self.KNOWN_DISTANCE = 31.1  # 실제 거리 cm
-        self.focal_length_found = self.focal_length(self.KNOWN_DISTANCE, self.KNOWN_HEIGHT, 105)
+        self.focal_length_found = self.focal_length(self.KNOWN_DISTANCE, self.KNOWN_HEIGHT, 104)
 
         self.prev_order = None
         self.cur_order = None
@@ -64,7 +64,7 @@ class ObjectDetection(nn.Module):
             color = (100, 120, 200)
         return color
 
-# 바운딩 박스 폭 계산 함수
+    # 바운딩 박스 폭 계산 함수
     def pixel_width_data(self, results, image):
         class_names = []  # object 이름
         widths = []  # 바운딩 박스 폭 or 높이
