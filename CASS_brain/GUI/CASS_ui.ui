@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>956</width>
-    <height>613</height>
+    <width>1000</width>
+    <height>700</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -22,7 +22,7 @@
     <property name="geometry">
      <rect>
       <x>800</x>
-      <y>350</y>
+      <y>420</y>
       <width>61</width>
       <height>61</height>
      </rect>
@@ -76,7 +76,7 @@
     <property name="geometry">
      <rect>
       <x>740</x>
-      <y>410</y>
+      <y>480</y>
       <width>61</width>
       <height>61</height>
      </rect>
@@ -130,7 +130,7 @@
     <property name="geometry">
      <rect>
       <x>800</x>
-      <y>470</y>
+      <y>540</y>
       <width>61</width>
       <height>61</height>
      </rect>
@@ -184,7 +184,7 @@
     <property name="geometry">
      <rect>
       <x>860</x>
-      <y>410</y>
+      <y>480</y>
       <width>61</width>
       <height>61</height>
      </rect>
@@ -1631,8 +1631,8 @@
      <rect>
       <x>20</x>
       <y>20</y>
-      <width>921</width>
-      <height>551</height>
+      <width>960</width>
+      <height>640</height>
      </rect>
     </property>
     <property name="palette">
@@ -2082,6 +2082,9 @@
     </property>
     <property name="text">
      <string>legCam</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
     </property>
    </widget>
    <widget class="QLabel" name="labelFaceCam">
@@ -2540,6 +2543,9 @@
     </property>
     <property name="text">
      <string>FaceCam</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
     </property>
    </widget>
    <widget class="QLabel" name="labelTrafficLightR">
@@ -3926,7 +3932,7 @@
     <property name="geometry">
      <rect>
       <x>800</x>
-      <y>410</y>
+      <y>480</y>
       <width>61</width>
       <height>61</height>
      </rect>
@@ -4842,7 +4848,7 @@ p, li { white-space: pre-wrap; }
    <widget class="QPushButton" name="btnPower">
     <property name="geometry">
      <rect>
-      <x>860</x>
+      <x>880</x>
       <y>40</y>
       <width>61</width>
       <height>61</height>
@@ -4934,27 +4940,101 @@ p, li { white-space: pre-wrap; }
    <widget class="QLabel" name="labelDirection">
     <property name="geometry">
      <rect>
-      <x>590</x>
-      <y>510</y>
-      <width>81</width>
+      <x>520</x>
+      <y>70</y>
+      <width>121</width>
       <height>31</height>
      </rect>
     </property>
     <property name="text">
-     <string>TextLabel</string>
+     <string>Direction</string>
     </property>
    </widget>
    <widget class="QPushButton" name="btnRegister">
     <property name="geometry">
      <rect>
-      <x>840</x>
-      <y>190</y>
-      <width>81</width>
+      <x>880</x>
+      <y>110</y>
+      <width>61</width>
       <height>21</height>
      </rect>
     </property>
     <property name="text">
      <string>register</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="btnRec">
+    <property name="geometry">
+     <rect>
+      <x>840</x>
+      <y>310</y>
+      <width>81</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>rec</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="labelState">
+    <property name="geometry">
+     <rect>
+      <x>520</x>
+      <y>30</y>
+      <width>121</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>State</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="labelStateInfo">
+    <property name="geometry">
+     <rect>
+      <x>430</x>
+      <y>30</y>
+      <width>81</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>State</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="labelDirectionInfo">
+    <property name="geometry">
+     <rect>
+      <x>430</x>
+      <y>70</y>
+      <width>81</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Direction</string>
+    </property>
+    <property name="alignment">
+     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+    </property>
+   </widget>
+   <widget class="QLabel" name="labelRec">
+    <property name="geometry">
+     <rect>
+      <x>70</x>
+      <y>60</y>
+      <width>71</width>
+      <height>18</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">color:red;</string>
+    </property>
+    <property name="text">
+     <string>◉  Rec</string>
     </property>
    </widget>
    <zorder>labelLegCam</zorder>
@@ -4977,13 +5057,18 @@ p, li { white-space: pre-wrap; }
    <zorder>btnTest</zorder>
    <zorder>labelDirection</zorder>
    <zorder>btnRegister</zorder>
+   <zorder>btnRec</zorder>
+   <zorder>labelState</zorder>
+   <zorder>labelStateInfo</zorder>
+   <zorder>labelDirectionInfo</zorder>
+   <zorder>labelRec</zorder>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>956</width>
+     <width>1000</width>
      <height>23</height>
     </rect>
    </property>

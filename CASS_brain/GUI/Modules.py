@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import socket
+import mysql.connector
 from torchvision import  transforms
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -35,7 +36,7 @@ class Camera(QThread):
 class TCP():
     def __init__(self):
         self.client_socket = None
-        self.esp32_ip = '172.20.10.8'  # ESP32의 IP 주소
+        self.esp32_ip = '172.20.10.10'  # ESP32의 IP 주소
         self.esp32_port = 8080 
         self.message = None
         self.isConnected = False
@@ -51,6 +52,7 @@ class TCP():
                 response = self.sendMsg("connect")
                 if type(response) == bytes:
                     response = response.decode('utf-8')
+                    print(response)
                 if response == "connected":
                     self.isConnected = True
                     print("="*10, "leg has well connected", "="*10)
@@ -91,14 +93,19 @@ class TCP():
             case "emergency":
                 self.message = "99"
         
+        """
+        for test without tcp
+        do annotate send, recv
+        undo annotate "test"
+        """
 
         self.message = self.message.encode()
-        self.client_socket.send(self.message)
+        self.client_socket.send(self.message) # send
         print("CASS_brain said : ", msg)
         time.sleep(0.5)
-        response = self.client_socket.recv(1024)
-        response = response.decode('utf-8')
-        # response = "test"
+        response = self.client_socket.recv(1024) #recv
+        response = response.decode('utf-8') 
+        # response = "test" # for test
         print("CASS_leg said : ", response)
         print("=" * 40)
 
@@ -107,6 +114,65 @@ class TCP():
     def close(self):
         self.client_socket.close()
 
+class DataBase():
+    def __init__(self):
+        self.local = None
+
+    def connectLocal(self):
+        self.local = mysql.connector.connect(
+            host = "localhost",
+            user = "root",
+            password = "0050",
+            database = "CASS"
+        )
+
+    def fetchUserData(self, path):
+        self.cur = self.local.cursor(buffered=True)
+        self.cur.execute(f"SELECT * WHERE path = {path} FROM DRIVER")
+        data = self.cur.fetchall()
+        driver_id = data[0][0]
+        driver_name = data[0][1]
+        driver_birth = data[0][2]
+        driver_contact = data[0][3]
+
+        return driver_id, driver_name, driver_birth, driver_contact
+    
+    def registerUser(self, name, birth, contact):
+        self.cur = self.local.cursor(buffered=True)
+        sql = "INSERT INTO DRIVER (name, birth, contact) VALUES (%s, %s, %s)"
+        val = (name, birth, contact)
+        self.cur.execute(sql, val)
+        self.local.commit()
+        sql_id = "select id from DRIVER order by id desc limit 1"
+        print(sql_id)
+        self.cur.execute(sql_id)
+        driver_id = self.cur.fetchone()[0]
+        print("registere success :", driver_id)
+
+        return driver_id
+
+    def registerPhoto(self, id, path):
+        self.cur = self.local.cursor(buffered=True)
+        sql = "UPDATE DRIVER SET path = %s WHERE id = %s"
+        val = (path, id)
+        self.cur.execute(sql, val)
+        self.local.commit()
+
+        print("registere success :", path)
+
+class Driver():
+    def __init__(self):
+        self.id = None
+        self.name = None
+        self.birth = None
+        self.contact = None
+
+    def getInfo(self, name, birth, contact):
+        self.name = name
+        self.birth = birth
+        self.contact = contact
+
+        print(self.name, self.birth, self.contact)
 
 class Arduino(QThread):
     distance_signal = pyqtSignal(str)  # 거리를 전달할 시그널
@@ -115,7 +181,7 @@ class Arduino(QThread):
         super().__init__()
         self.main = parent
         self.client_socket = None
-        self.esp32_ip = '172.20.10.8'  # ESP32의 IP 주소
+        self.esp32_ip = '172.20.10.10'  # ESP32의 IP 주소
         self.esp32_port = 8080  # ESP32에서 설정한 포트
 
     def run(self):
