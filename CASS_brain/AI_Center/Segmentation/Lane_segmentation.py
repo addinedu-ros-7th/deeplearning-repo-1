@@ -33,6 +33,8 @@ class LaneSegmentation(nn.Module):
         self.model = YOLO(checkpoint_path)
         self.center = Centroid()
         self.N2C = {'0': 'center_road', '1': 'left_road', '2': 'right_road'}
+        self.roads = {'center':[], 'side':[]}
+        self.data = {'slope':None, 'avoid':False, 'is_side':True}
 
     def is_point_in_bbox(self, point, bbox):
         x, y = point
@@ -40,61 +42,72 @@ class LaneSegmentation(nn.Module):
         return x_min <= x <= x_max and y_min <= y <= y_max
     
     def forward(self, frame, direction='straight', select_road='center', obstackle=None):
+        '''
+        frame : image
+        direction : straight, left, right
+        select_road : center, left, right, side_park
+        obstackle : [x_min, y_min, x_max, y_max]
+        '''
         output = self.model(frame, verbose=False, device=0)
         frame = output[0].orig_img
         avoid = False
         is_side = True
         cls = output[0].boxes.cls
         img_size = output[0].masks.orig_shape
-
         mid_ = int(img_size[1]/2)
         bot_ = img_size[0]
+        self.roads = {'center':[], 'side':[]}
         start_point = (mid_, bot_)
         l_cnt = 0
         r_cnt = 0
-        roads = {'center':[], 'side':[]}
         cnst = 100
+
         for i, xy in enumerate(output[0].masks.xy):
+                
             self.center.get_centroid(xy)
             point_x = self.center.centroid_x
             point_y = self.center.centroid_y
-            if point_x < cnst or point_x > img_size[1] - cnst:
+
+            if select_road=='side_park':
+                nxy = xy[(xy[:, 1] > point_y - 10) * (xy[:, 1] < point_y + 10)]
+                point_x = nxy[nxy[:, 0].argmax()][0]
+            
+            elif point_x < cnst or point_x > img_size[1] - cnst:
                 continue
+            
             slope = -(start_point[0] - point_x)/(start_point[1] - point_y)
             slope = round(np.rad2deg(np.arctan(slope)))
-            point = np.array([self.center.centroid_x, self.center.centroid_y, slope], dtype=np.int32)
+            point = np.array([point_x, point_y, slope], dtype=np.int32)
             
             c_name = self.N2C[str(int(cls[i].item()))]
             if c_name=='center_road':
-                roads['center'].append(np.expand_dims(point, axis=0))
+                self.roads['center'].append(np.expand_dims(point, axis=0))
 
-            if select_road=='left':
-                if c_name=='left_road':
-                    l_cnt += 1
-                    roads['side'].append(np.expand_dims(point, axis=0))
-            elif select_road=='right':
+            if select_road=='right' or select_road=='side_park':
                 if c_name=='right_road':
                     r_cnt += 1
-                    roads['side'].append(np.expand_dims(point, axis=0))
+                    self.roads['side'].append(np.expand_dims(point, axis=0))
+            elif select_road=='left':
+                if c_name=='left_road':
+                    l_cnt += 1
+                    self.roads['side'].append(np.expand_dims(point, axis=0))
         
         if select_road == 'center':
-            road = roads['center']
+            road = self.roads['center']
             if len(road) == 0:
-                road = roads['side']
+                road = self.roads['side']
         else:
-            road = roads['side']
+            road = self.roads['side']
             if len(road) == 0:
-                road = roads['center']    
+                is_side = False
+                road = self.roads['center']    
+        
         road = np.concatenate(road, axis=0)
         road = road[road[:, -1].argsort()]
         if direction == 'left':
-            if l_cnt==0:    
-                is_side = False
             slope = road[-1]
             road = road[0][:2]
         elif direction == 'right':
-            if r_cnt==0:
-                is_side = False
             slope = road[-1]
             road = road[-1][:2]
         else:
@@ -116,7 +129,7 @@ class LaneSegmentation(nn.Module):
         cv2.arrowedLine(frame, start_point, road,
                             color=(0, 0, 0), 
                             thickness=5, tipLength=0.1)
-
-        return slope[0], avoid, is_side
+        self.data = {'slope':slope[0], 'avoid':avoid, 'is_side':is_side}
+        return self.data
     
 
