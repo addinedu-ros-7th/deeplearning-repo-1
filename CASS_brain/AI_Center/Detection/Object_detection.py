@@ -160,7 +160,7 @@ class ObjectDetection(nn.Module):
             if (obj_name != None and obj_boxes != None):
                 cv2.rectangle(frame, obj_boxes[:2], obj_boxes[2:], self.color_finder(obj_name), 2)
                 cv2.putText(frame, obj_name, (obj_boxes[0], obj_boxes[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, self.color_finder(obj_name), 2)
-                cv2.putText(frame, f"{distance} cm", (obj_boxes[0], obj_boxes[-1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.57, self.color_finder(name), 2)
+                cv2.putText(frame, f"{distance} cm", (obj_boxes[0], obj_boxes[-1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.57, self.color_finder(obj_name), 2)
 
             if obst_pos != None:
                 obst = obst_pos
@@ -187,4 +187,6 @@ class ObjectDetection(nn.Module):
         # 중복 제거
         cls_list = list(set(cls_list))
 
-        return self.cur_order, frame, obst, cls_list
+        self.data = {'order':self.cur_order, 'obstacle':obst, 'cls_list':cls_list}
+        
+        return self.data, frame
