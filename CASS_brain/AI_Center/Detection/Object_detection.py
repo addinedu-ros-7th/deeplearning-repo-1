@@ -71,15 +71,9 @@ class ObjectDetection(nn.Module):
         boxes = []  # 바운딩 박스 좌표
         for result in results[0].boxes:
             x1, y1, x2, y2 = map(int, result.xyxy[0].tolist())
-            confidence = result.conf[0]
             cls_id = int(result.cls[0])
             cls_name = self.names[cls_id]
-            label = f"{cls_name}: {confidence:.2f}"
 
-            # 바운딩 박스 및 레이블 그리기
-            cv2.rectangle(image, (x1, y1), (x2, y2), self.color_finder(cls_name), 2)
-            cv2.putText(image, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, self.color_finder(cls_name), 2)
-        
             # 'person', 'goat', 'obstacle' 이면 높이를 사용
             if cls_name in self.known_heights:
                 ref_image_width = y2 - y1
@@ -96,6 +90,8 @@ class ObjectDetection(nn.Module):
     def control_signal(self, name, distance, boxes, class_names):
         order = ""
         pos = None
+        cls_name = None
+        result_boxes = None
         if (name == 'red_light'): 
             if (distance < 33):
                 order = "stop"
@@ -105,6 +101,8 @@ class ObjectDetection(nn.Module):
         elif (name == 'person'):
             if distance < 12:
                 order = "stop"
+                cls_name = name
+                result_boxes = boxes
         elif (name == 'obstacle'):
             if distance < 15:
                 order = "drive"
@@ -112,10 +110,12 @@ class ObjectDetection(nn.Module):
         elif (name == 'goat'):
             if distance < 12:
                 order = "stop"
+                cls_name = name
+                result_boxes = boxes
         else:
             pass
 
-        return order, pos
+        return order, pos, cls_name, result_boxes
     
     def forward(self, frame):
         h, w = frame.shape[:2]
@@ -148,13 +148,14 @@ class ObjectDetection(nn.Module):
                                                 self.known_heights[name], width)
             else:
                 continue
-                
-            # 횡단 보도, 정지선은 거리 표시 안함
-            if not name in ['cross_walk', 'stop_line']:    
-                cv2.putText(frame, f"{distance} cm", (x1, y2 + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.57, self.color_finder(name), 2)
 
             cls_boxes = (x1, y1, x2, y2)
-            order, obs_pos = self.control_signal(name, distance, cls_boxes, class_names)
+            order, obs_pos, obj_name, obj_boxes = self.control_signal(name, distance, cls_boxes, class_names)
+
+            if not (obj_name == None and obj_boxes == None):
+                cv2.rectangle(frame, obj_boxes[:2], obj_boxes[2:], self.color_finder(obj_name), 2)
+                cv2.putText(frame, obj_name, (obj_boxes[0], obj_boxes[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, self.color_finder(obj_name), 2)
+                cv2.putText(frame, f"{distance} cm", (obj_boxes[0], obj_boxes[-1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.57, self.color_finder(name), 2)
 
             if obs_pos != None:
                 obst = obs_pos
