@@ -89,7 +89,7 @@ class ObjectDetection(nn.Module):
     # 신호 보내기
     def control_signal(self, name, distance, boxes, class_names):
         order = None
-        pos = None
+        obst_pos = None
         cls_name = None
         result_boxes = None
         if (name == 'red_light'): 
@@ -108,7 +108,7 @@ class ObjectDetection(nn.Module):
         elif (name == 'obstacle'):
             if distance < 15:
                 order = "drive"
-                pos = boxes
+                obst_pos = boxes
                 cls_name = name
         elif (name == 'goat'):
             if distance < 12:
@@ -121,7 +121,7 @@ class ObjectDetection(nn.Module):
         else:
             pass
 
-        return order, pos, cls_name, result_boxes
+        return order, obst_pos, cls_name, result_boxes
     
     def forward(self, frame):
         h, w = frame.shape[:2]
@@ -155,15 +155,15 @@ class ObjectDetection(nn.Module):
             else:
                 continue
 
-            order, obs_pos, obj_name, obj_boxes = self.control_signal(name, distance, cls_boxes, class_names)
+            order, obst_pos, obj_name, obj_boxes = self.control_signal(name, distance, cls_boxes, class_names)
 
             if (obj_name != None and obj_boxes != None):
                 cv2.rectangle(frame, obj_boxes[:2], obj_boxes[2:], self.color_finder(obj_name), 2)
                 cv2.putText(frame, obj_name, (obj_boxes[0], obj_boxes[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, self.color_finder(obj_name), 2)
                 cv2.putText(frame, f"{distance} cm", (obj_boxes[0], obj_boxes[-1] + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.57, self.color_finder(name), 2)
 
-            if obs_pos != None:
-                obst = obs_pos
+            if obst_pos != None:
+                obst = obst_pos
 
             order_list.append(order)
 
