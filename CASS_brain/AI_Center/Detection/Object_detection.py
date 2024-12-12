@@ -177,7 +177,7 @@ class ObjectDetection(nn.Module):
             self.cur_order = 'drive'
             text_color = (34, 139, 34)
 
-        cv2.putText(frame, self.cur_order, (40, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, text_color, 4)
+        cv2.putText(frame, self.cur_order, (40, 400), cv2.FONT_HERSHEY_DUPLEX, 1.5, text_color, 4)
 
         # esp 로 명령 보내기
         if self.prev_order != self.cur_order:
@@ -188,5 +188,5 @@ class ObjectDetection(nn.Module):
         cls_list = list(set(cls_list))
 
         self.data = {'order':self.cur_order, 'obstacle':obst, 'cls_list':cls_list}
-        
+
         return self.data, frame
