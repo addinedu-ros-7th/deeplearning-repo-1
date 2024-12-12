@@ -183,5 +183,8 @@ class ObjectDetection(nn.Module):
         if self.prev_order != self.cur_order:
             # print(self.cur_order)
             self.prev_order = self.cur_order    
+        
+        # 중복 제거
+        cls_list = list(set(cls_list))
 
         return self.cur_order, frame, obst, cls_list
