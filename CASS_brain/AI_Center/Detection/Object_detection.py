@@ -65,7 +65,7 @@ class ObjectDetection(nn.Module):
         return color
 
     # 바운딩 박스 폭 계산 함수
-    def pixel_width_data(self, results, image):
+    def pixel_width_data(self, results):
         class_names = []  # object 이름
         widths = []  # 바운딩 박스 폭 or 높이
         boxes = []  # 바운딩 박스 좌표
@@ -134,7 +134,7 @@ class ObjectDetection(nn.Module):
         frame_results = self.model.predict(frame, conf=0.55, verbose=False)
         
         # 바운딩 박스 폭 or 높이 구하기
-        class_names, widths, boxes = self.pixel_width_data(frame_results, frame)
+        class_names, widths, boxes = self.pixel_width_data(frame_results)
 
         # 현재 프레임에 대한 order 값
         order_list = []
