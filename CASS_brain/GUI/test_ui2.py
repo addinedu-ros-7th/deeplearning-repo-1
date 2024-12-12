@@ -48,7 +48,6 @@ class CASS_ui(QMainWindow, from_class):
     
     def push_info(self):
         objs, direction, select_road = self.input_data.values()
-        print(objs, direction, select_road)
         self.updateUI(objs, direction, select_road)
 
 
