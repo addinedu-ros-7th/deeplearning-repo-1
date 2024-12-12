@@ -133,6 +133,9 @@ class ObjectDetection(nn.Module):
         # 현재 프레임에 대한 order 값
         order_list = []
 
+        # 현재 프레임에서 인식된 object
+        cls_list = []
+
         # obstacle 바운딩 박스 좌표
         obst = None
 
@@ -157,6 +160,8 @@ class ObjectDetection(nn.Module):
                 obst = obs_pos
 
             order_list.append(order)
+            cls_list.append(name)
+
 
         if 'stop' in order_list:
             self.cur_order = 'stop'
@@ -172,4 +177,4 @@ class ObjectDetection(nn.Module):
             # print(self.cur_order)
             self.prev_order = self.cur_order    
 
-        return self.cur_order, frame, obst
+        return self.cur_order, frame, obst, cls_list
