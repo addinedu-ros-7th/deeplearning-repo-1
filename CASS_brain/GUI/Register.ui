@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>436</width>
-    <height>315</height>
+    <height>309</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -20,43 +20,43 @@
   <widget class="QPushButton" name="btnUserRegister">
    <property name="geometry">
     <rect>
-     <x>120</x>
-     <y>220</y>
-     <width>111</width>
-     <height>51</height>
-    </rect>
-   </property>
-   <property name="styleSheet">
-    <string notr="true">QPushButton{background-color:#F5C26B;
-border-radius:10px;}
-
-QPushButton:pressed{background-color:#4169E1; color:white;
-border-radius:20px; border-width:10px;}
-
-QPushButton:hover{background-color:#F5C26B; border-width:10px;
-border-radius:20px;}</string>
-   </property>
-   <property name="text">
-    <string>등록정보 수정</string>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="btnCancle">
-   <property name="geometry">
-    <rect>
-     <x>260</x>
+     <x>150</x>
      <y>220</y>
      <width>51</width>
      <height>51</height>
     </rect>
    </property>
    <property name="styleSheet">
-    <string notr="true">QPushButton{background-color:#F5C26B;
+    <string notr="true">QPushButton{background-color:#15e6c3;
 border-radius:10px;}
 
 QPushButton:pressed{background-color:#4169E1; color:white;
 border-radius:20px; border-width:10px;}
 
-QPushButton:hover{background-color:#F5C26B; border-width:10px;
+QPushButton:hover{background-color:#15e6c3; border-width:10px;
+border-radius:20px;}</string>
+   </property>
+   <property name="text">
+    <string>등록</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="btnReturn">
+   <property name="geometry">
+    <rect>
+     <x>230</x>
+     <y>220</y>
+     <width>51</width>
+     <height>51</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">QPushButton{background-color:#15e6c3;
+border-radius:10px;}
+
+QPushButton:pressed{background-color:#4169E1; color:white;
+border-radius:20px; border-width:10px;}
+
+QPushButton:hover{background-color:#15e6c3; border-width:10px;
 border-radius:20px;}</string>
    </property>
    <property name="text">

@@ -1,10 +1,11 @@
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import *
 from PyQt5 import uic
 from Modules import *
 
 import os 
+import time
 import glob
 import cv2
 import sys
@@ -31,45 +32,24 @@ form_register_class = uic.loadUiType(register_file)[0]
 # ESP32_PORT = 8080
 # client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-legCamID = 0
-faceCamID = 2
+index = True
 
-class Driver():
-    def __init__(self):
-        self.id = None
-        self.name = None
-        self.birth = None
-        self.contact = None
-
-    def getInfo(self, name, birth, contact):
-        self.name = name
-        self.birth = birth
-        self.contact = contact
-
-        print(self.name, self.birth, self.contact)
+legCamID = 0 if index else 2
+faceCamID = 2 if index else 0
 
 class MainWindow(QMainWindow, form_class):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("CASS Driving")
+
         self.setCamThreads()
+        self.setStates()
+        self.setBtns()
+
+        self.driver = Driver()
+        self.db = DataBase()
         self.TCP = TCP()
-
-        self.duration = 0
-        self.maxDiff = 200
-        self.authentified = False
-        self.stopFlag = False
-        self.isDrive = False
-        self.isPersonAppear = False
-        self.isRedLight = False
-        self.isGreenLight = False
-
-        self.direction = "straight"
-        self.road = "drive"
-        self.order = None
-        self.prev_order = None
-        # self.TCP.connect()
 
         self.ath_model = FaceRecognitionModel() # face athentification model
         self.setUserImage()
@@ -79,8 +59,6 @@ class MainWindow(QMainWindow, form_class):
     
         self.setLabelCams()
         self.cameraOn()
-
-        self.setBtns()
 
     # def setPlots(self):
     #     self.plotDiff = self.findChild(pg.PlotWidget, 'plotDiff')
@@ -93,28 +71,80 @@ class MainWindow(QMainWindow, form_class):
 
     # def updatePlots(self):
     #     self.data_line = self.plotDiff.plot(self.pen='y')
+
+    def setStates(self):
+        self.duration = 0
+        self.maxDiff = 200
+        self.count = 0
+        self.authentified = False
+        self.stopFlag = False
+        self.isDrive = False
+        self.isPersonAppear = False
+        self.isRedLight = False
+        self.isGreenLight = False
+        self.isRecording = False
+
+        # Lane Segmentation Parameter
+        self.st = time.time()
+        self.et = time.time()
+        self.dt = 0
+        self.avoid_check = False
+        self.checkitout = True
+        self.road_select = 'center'
+        self.direction = "straight"
+        self.road = "center"
+        self.order = None
+        self.prev_order = None
+        self.curFlag = None
+
     def setBtns(self):
+        self.labelRec.hide()
+
+        self.btnRec.clicked.connect(self.clickRecord)
+        self.btnRegister.clicked.connect(self.register)
+
+        self.btnForward.clicked.connect(lambda: self.setDirection("straight"))
+        self.btnRight.clicked.connect(lambda: self.setDirection("right"))
+        self.btnLeft.clicked.connect(lambda: self.setDirection("left"))
+        self.btnStop.clicked.connect(lambda: self.setDirection("stop"))
+
+        # if self.isDrive == False:
+        self.btnPower.clicked.connect(self.driveState)
+        # else:
+            # self.btnRight.clicked.connect(lambda: self.road("right")) # 추월용 비키삼~!
+            # self.btnLeft.clicked.connect(lambda: self.road("left"))
+            # self.btnBackward.clicked.connect(lambda: self.road("back"))
+
         #for testing
         self.btnCamOn.clicked.connect(self.legCamOn)
         self.btnConnect.clicked.connect(self.connectLeg)
         self.btnTest.clicked.connect(self.test)
 
-        self.btnRegister.clicked.connect(self.register)
-        self.btnRight.clicked.connect(lambda: self.direction("right"))
-        self.btnLeft.clicked.connect(lambda: self.direction("left"))
-
-        if self.isDrive == False:
-            self.btnForward.clicked.connect(self.driveState)
-        else:
-            self.btnForward.clicked.connect(lambda: self.direction("straight"))
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_W:
+            self.setDirection("straight")
+            print(event)
+        elif event.key() == Qt.Key_A:
+            self.setDirection("left")
+        elif event.key() == Qt.Key_D:
+            self.setDirection("right")
+        elif event.key() == Qt.Key_S:
+            self.setDirection("stop")
+        elif event.key() == Qt.Key_O:
+            self.driveState()
 
     def setDirection(self, direction):
         self.direction = direction
         self.labelDirection.setText(direction)
+        print("set direction to the ", direction)
 
     def driveState(self):
-        self.isDrive = True
-        print(self.isDrive)
+        if self.isDrive == False:
+            self.isDrive = True
+        else:
+            self.isDrive = False
+
+        print("leg has started driving ? ", self.isDrive)
 
     def test(self):
         print("test env")
@@ -124,6 +154,52 @@ class MainWindow(QMainWindow, form_class):
         self.btnCamOn.hide()
         self.authentified = True
 
+    def clickRecord(self):
+        if self.isRecording == False:
+            self.labelRec.show()
+            self.isRecording = True
+            self.recordingStart()
+        else:
+            self.labelRec.hide()
+            self.isRecording = False
+            self.recordingStop()
+
+    def updateRecording(self):
+        if self.isRecording == True:
+            self.count += 1
+            self.writer.write(self.leg_frame)
+
+            if self.count % 8 == 0:
+                self.labelRec.hide()
+            else:
+                self.labelRec.show()
+        else:
+            self.labelRec.hide()
+            self.count = 0
+
+    def recordingStart(self):
+        print("record started")
+        self.record.running = True
+        self.record.start()
+
+        self.now = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = '../../../test/data/face/drive/' + self.now + '.avi'
+        self.fourcc = cv2.VideoWriter_fourcc(*'XVID')
+
+        w = int(self.legVideo.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(self.legVideo.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
+        self.writer = cv2.VideoWriter(filename, self.fourcc, 20.0, (w, h))
+
+    def recordingStop(self):
+        print("record released")
+        self.record.running = False
+        self.labelRec.hide()
+
+        if self.isRecording == True:
+            self.writer.release()
+            self.labelRec.hide()
+
     def connectLeg(self):
         self.TCP.connectLeg()
         self.TCP.sendMsg("connect")
@@ -131,13 +207,17 @@ class MainWindow(QMainWindow, form_class):
 
     def setCamThreads(self):
         self.faceCam = Camera()
-        self.daemon = True
+        self.faceCam.daemon = True
         self.faceCam.update.connect(self.updateFaceCam)
 
         self.legCam = Camera()
-        self.daemon = True
+        self.legCam.daemon = True
         self.legCam.update.connect(self.updateLegCam2)
         # self.legCam.update.connect(self.updatePlots)
+
+        self.record = Camera()
+        self.record.daemon = True
+        self.record.update.connect(self.updateRecording)
     
     def setLabelCams(self):
         self.width, self.height = self.labelFaceCam.width(), self.labelFaceCam.height()
@@ -179,8 +259,11 @@ class MainWindow(QMainWindow, form_class):
         self.authentified = True
 
     def setUserImage(self):
+        path_dir = "../../../test/data/face/register"
+        file_name = os.listdir(path_dir)
+        path_name = file_name[0][:-4]
         '''
-        TODO:needkk to create user image
+        TODO:need to create user image
         '''
         self.path = "../../../test/data/face/test_img/img_sb.png"
         self.name = "soyoung"
@@ -188,15 +271,52 @@ class MainWindow(QMainWindow, form_class):
         self.ath_model.set_user_image(self.path)
         self.ath_model.set_known_user(self.ath_model.my_face_encoding, self.name)
 
-    def createUserImage(self):
-        self
-        cv2.imwrite()
-
     def register(self):
-        register_window = RegisterWindow(self)
-        register_window.frameGeometry().moveCenter(QDesktopWidget().availableGeometry().center())
-        register_window.move(self.frameGeometry().topLeft())
-        register_window.show()
+        self.registerWindow = QDialog(self)
+        uic.loadUi("Register.ui", self.registerWindow)
+        self.registerWindow.btnUserRegister.clicked.connect(self.userRegister)
+        self.registerWindow.btnReturn.clicked.connect(self.returnMain)
+        self.registerWindow.editContactNumber.textChanged.connect(self.legExCheck)
+        self.registerWindow.show()
+        self.db.connectLocal()
+
+    def userRegister(self):
+        name = self.registerWindow.editName.text()
+        birth = self.registerWindow.dateEditBirth.date().toPyDate()
+        contact_number = self.registerWindow.editContactNumber.text()
+
+        if name == "" or birth == "" or contact_number == "":
+            QMessageBox.warning(self, "warning", "빈칸을 채워주세요")
+            return
+        
+        else:
+            self.driver.getInfo(name, birth, contact_number)
+            self.registerWindow.hide()
+            self.driver_id = self.db.registerUser(name, birth, contact_number)
+            QMessageBox.warning(self, "Photo", "정면을 보세요~ 2초 뒤 사진이 촬영됩니다.")
+
+            time.sleep(2)
+            self.createUserImage(self.driver_id, name)
+
+    def createUserImage(self, driver_id, name):
+        dir = "../../../test/data/face/register/"
+        self.path = str(driver_id) + name
+        cv2.imwrite(dir + self.path + ".png", cv2.cvtColor(self.face_frame, cv2.COLOR_BGR2RGB))
+        self.db.registerPhoto(driver_id, self.path)
+        self.db.local.close()
+
+    def legExCheck(self):
+        tmp = self.registerWindow.editContactNumber.text()
+        if len(tmp) == 3 and self.len_prev == 2:
+            self.registerWindow.editContactNumber.setText(tmp + "-")
+        elif len(tmp) == 8 and self.len_prev == 7:
+            self.registerWindow.editContactNumber.setText(tmp + "-")
+        elif len(tmp) == 8 and self.len_prev == 9:
+            self.registerWindow.editContactNumber.setText(tmp + "-")
+        self.len_prev = len(tmp)
+
+    def returnMain(self):
+        self.registerWindow.hide()
         
     def authentification(self, frame):
         '''
@@ -224,10 +344,13 @@ class MainWindow(QMainWindow, form_class):
                     self.cameraOn()
 
     def updateFaceCam(self):
-        ret, face_frame = self.faceVideo.read()
+        """
+        for face authentification and if authentified for drowsy detection
+        """
+        ret, self.face_frame = self.faceVideo.read()
         
         if ret:
-            frame = cv2.cvtColor(face_frame, cv2.COLOR_BGR2RGB)
+            frame = cv2.cvtColor(self.face_frame, cv2.COLOR_BGR2RGB)
             frame = cv2.flip(frame, 1)
             
             self.end = time.time()
@@ -313,35 +436,6 @@ class MainWindow(QMainWindow, form_class):
             self.legPixmap = self.legPixmap.scaled(self.w, self.h)
             self.labelLegCam.setPixmap(self.legPixmap)
 
-    # def objectDetection(self, results, frame):
-    #     class_names = []
-    #     widths = []
-    #     boxes = []  
-    #     for result in results[0].boxes:
-    #         x1, y1, x2, y2 = map(int, result.xyxy[0].tolist())
-    #         confidence = result.conf[0]
-    #         class_id = int(result.cls[0])
-    #         label = f"{self.detect_model.names[class_id]}: {confidence:.2f}"
-    #         obj = self.detect_model.names[class_id]
-    #         label = f"{obj}: {confidence:.2f}"
-    #         color_class = self.detect_model.color_finder(obj)
-
-    #         cv2.rectangle(frame, (x1, y1), (x2, y2), self.detect_model.color_finder(self.detect_model.names[class_id]), 2)
-    #         cv2.putText(frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.0, self.detect_model.color_finder(self.detect_model.names[class_id]), 2)
-    #         cv2.rectangle(frame, (x1, y1), (x2, y2), 
-    #                       color_class, 2)
-    #         cv2.putText(frame, label, (x1, y1 - 10), 
-    #                     cv2.FONT_HERSHEY_SIMPLEX, 1.0, 
-    #                     color_class, 2)
-
-    #         ref_image_width = x2 - x1
-    #         class_names.append(self.detect_model.names[class_id])
-    #         class_names.append(obj)
-    #         widths.append(ref_image_width)
-    #         boxes.append((x1, y1, x2, y2))
-
-    #     return class_names, widths, boxes
-
     def updateLegCam2(self):
         ret, self.frame = self.legVideo.read()
         
@@ -350,76 +444,81 @@ class MainWindow(QMainWindow, form_class):
             frame = self.frame.copy()
             h, w, c = frame.shape
             try:
-                order, frame = self.detect_model(frame)
-                '''
-                    direction, road = order[0], order[1]
-                '''
-                direction, road = 'straight', 'drive'
-                slope, frame = self.segment_model(frame, direction, road)
+                order, frame, obstacle = self.detect_model(frame)
             except:
-                return
-            if slope:
-                th = 30
-                th_r = th/2
-                th_l = - (th/2)
+                pass
+            try:
+                '''
+                    # direction : straight, left, right
+                    # select_road : center, left, right
+                '''
+                slope, avoid, is_side = self.segment_model(frame, self.direction, self.road, obstacle)
 
-                if self.isDrive == True:
-                    direction = "forward"
+                if not(is_side) and self.road != 'center':
+                    self.road = 'center'
+                if avoid != self.avoid_check and self.check:
+                    self.check = False
+                    self.st = time.time()
+                    if avoid:
+                        self.avoid_check = avoid
+                        self.road_select = 'left'
+                    else:
+                        self.road_select = 'center'
+                        self.avoid_check = avoid
 
-                    if self.isPersonAppear == False:
-                        if slope < th_l or slope > th_r :
-                            response = self.TCP.sendMsg("drive")
-                        elif slope > th_r:
-                            response = self.TCP.sendMsg("R1")
-                            if slope > th_r + th:
-                                response = self.TCP.sendMsg("R2")
-                        elif slope < th_l:
-                            response = self.TCP.sendMsg("L1")
-                            if slope < th_l - th:
-                                response = self.TCP.sendMsg("L2")
-                    
-                    self.labelDirection.setText(response)
+                if self.avoid_check:
+                    self.et = time.time()
+                    self.dt = self.et - self.st
+                    if self.dt > 2 and self.dt <= 6:
+                        self.road_select = 'right'
+                    elif self.dt > 6:
+                        self.st = time.time()
+                        self.check = True
+            except:
+                pass
+                
+            if self.isDrive == True:
+                if order == 'straight' or order == 'Avoidance':
+                    try:
+                        if slope:
+                            th = 30
+                            th_r = th/2
+                            th_l = - (th/2)
 
-            cvt_color_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            qImg = QImage(cvt_color_frame, w, h, w*c, QImage.Format_RGB888)
+                            if slope < th_l or slope > th_r :
+                                response = "drive"
+                            elif slope > th_r:
+                                response = "R1"
+                                if slope > th_r + th:
+                                    response = "R2"
+                            elif slope < th_l:
+                                response = "L1"
+                                if slope < th_l - th:
+                                    response = "L2"
+                        else:
+                            response = "drive"
+                    except:
+                        # print("no driveway")
+                        response = "no driveway"
+                else:
+                    response = "stop"
+            else:
+                response = "stop"
+
+            if response != self.curFlag and response != "no driveway":
+                print("response : ", response)
+                self.curFlag = response
+                self.TCP.sendMsg(response)
+            
+            self.labelState.setText(response)
+            self.labelDirection.setText(self.direction)
+
+            self.leg_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            qImg = QImage(self.leg_frame, w, h, w*c, QImage.Format_RGB888)
             self.legPixmap = self.legPixmap.fromImage(qImg)
             self.legPixmap = self.legPixmap.scaled(self.w, self.h)
             self.labelLegCam.setPixmap(self.legPixmap)
 
-class RegisterWindow(QMainWindow, form_register_class):
-    def __init__(self, windowClass):
-        super().__init__()
-        self.setupUi(self)
-        self.setWindowTitle("주행자 정보 등록")
-        self.windowClass = windowClass
-        self.driver = Driver()
-
-        self.editContactNumber.textChanged.connect(self.legExCheck)
-
-    def userRegister(self):
-        name = self.editName.text()
-        birth = self.dateEditBirth.date().toPyDate()
-        contact_number = self.editContactNumber.text()
-
-        if name == "" or birth == "" or contact_number == "":
-            QMessageBox.warning(self, "warning", "빈칸을 채워주세요")
-            return
-        
-        else:
-            self.driver.getInfo(name, birth, contact_number)
-    
-    def legExCheck(self):
-        tmp = self.editContactNumber.text()
-        if len(tmp) == 3 and self.len_prev == 2:
-            self.editContactNumber.setText(tmp + "-")
-        elif len(tmp) == 8 and self.len_prev == 7:
-            self.editContactNumber.setText(tmp + "-")
-        elif len(tmp) == 8 and self.len_prev == 9:
-            self.editContactNumber.setText(tmp + "-")
-        self.len_prev = len(tmp)
-
-    def returnSetting(self):
-        self.hide()
     
 if __name__ == "__main__":
     app = QApplication(sys.argv)
