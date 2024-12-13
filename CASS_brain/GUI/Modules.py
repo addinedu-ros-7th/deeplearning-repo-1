@@ -2,22 +2,19 @@ import os
 import cv2
 import time
 import timm
-import face_recognition
-import serial
 import torch
 import torch.nn as nn
 import numpy as np
-import socket
 import mysql.connector
-from torchvision import  transforms
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
-from PyQt5.QtCore import *
-from huggingface_hub import hf_hub_download
-from ultralytics import YOLO
-from supervision import Detections
+import face_recognition
 
-class Camera(QThread):
+from PyQt5.QtCore import QThread, pyqtSignal
+from huggingface_hub import hf_hub_download
+from torchvision import  transforms
+from supervision import Detections
+from ultralytics import YOLO
+
+class Thread(QThread):
     update = pyqtSignal()
 
     def __init__(self, sec=0, parent=None):
@@ -35,38 +32,11 @@ class Camera(QThread):
 
 class TCP():
     def __init__(self):
-        self.client_socket = None
         self.esp32_ip = '192.168.9.46'  # ESP32의 IP 주소
         self.esp32_port = 8080 
         self.message = None
-        self.isConnected = False
 
-    def connectLeg(self):
-        print("try connecting to CASS_leg...")
-        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-        if self.isConnected == False:
-            try:
-                self.client_socket.connect((self.esp32_ip, self.esp32_port))
-                time.sleep(0.5)
-                response = self.sendMsg("connect")
-                if type(response) == bytes:
-                    response = response.decode('utf-8')
-                    print(response)
-                if response == "connected":
-                    self.isConnected = True
-                    print("="*10, "leg has well connected", "="*10)
-                else:
-                    print("not byte not str what are you", response)
-
-            except(ConnectionRefusedError):
-                print("connection refused")
-                self.isConnected = False
-                self.connectLeg()
-        else:
-            print("CASS_leg is already connected")
-
-    def sendMsg(self, msg):
+    def encodeMsg(self, msg):
         match(msg):
             case "connect":
                 self.message = "11"
@@ -93,26 +63,7 @@ class TCP():
             case "emergency":
                 self.message = "99"
         
-        """
-        for test without tcp
-        do annotate send, recv
-        undo annotate "test"
-        """
-        # self.client_socket.settimeout(0.02) 
-
-        # self.message = self.message.encode()
-        # self.client_socket.send(self.message) # send
-        # print("CASS_brain said : ", msg)
-        # response = self.client_socket.recv(1024) #recv
-        # response = response.decode('utf-8') 
-        # response = "test" # for test
-        # print("CASS_leg said : ", response)
-        # # print("=" * 40)
-
-        # return response
-    
-    def close(self):
-        self.client_socket.close()
+        return self.message
 
 class DataBase():
     def __init__(self):
@@ -174,40 +125,6 @@ class Driver():
 
         print(self.name, self.birth, self.contact)
 
-class Arduino(QThread):
-    distance_signal = pyqtSignal(str)  # 거리를 전달할 시그널
-
-    def __init__(self, parent=None):
-        super().__init__()
-        self.main = parent
-        self.client_socket = None
-        self.esp32_ip = '172.20.10.10'  # ESP32의 IP 주소
-        self.esp32_port = 8080  # ESP32에서 설정한 포트
-
-    def run(self):
-        # 아두이노 시리얼 포트 열기
-        try:
-            self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            # self.client_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1) 
-            self.client_socket.connect((self.esp32_ip, self.esp32_port))
-            time.sleep(1)  # 시리얼 연결 대기
-            print('ESP32 Connected')
-        except serial.SerialException as e:
-            print(f"Could not open serial port: {e}")
- 
-        while True:
-            try:
-                self.client_socket.settimeout(0.01) 
-                data = self.client_socket.recv(1024).decode()
-                self.distance_signal.emit(data)  # 시그널로 데이터 전달
-                time.sleep(0.03)
-            except:
-                pass
-
-    def stop(self):
-        print('ESP32 Disconnected')
-        self.client_socket.close()  # 시리얼 포트 닫기
-
 class DrowseDetectionModel(nn.Module):
     def __init__(self):        
         super().__init__()
@@ -224,7 +141,7 @@ class DrowseDetectionModel(nn.Module):
         self.model.eval()
 
     def get_state_dict(self, checkpoint_path):
-        path = os.path.join(checkpoint_path, 'best_model.pth')
+        path = os.path.join(checkpoint_path)
         self.model.load_state_dict(torch.load(path))
 
     def forward(self, x):
@@ -245,6 +162,18 @@ class DetectionModel(nn.Module):
         results = Detections.from_ultralytics(output[0])
         bbox = results.xyxy[0].astype(int) + np.array([-40, -60, 40, 10])
         return bbox
+    
+class DrowsyDetection(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.face_detect = DetectionModel()
+        self.drowsy_detect = DrowseDetectionModel()
+        self.drowsy_detect.get_state_dict('bestFace.pth')
+
+    def forward(self, frame):
+        x1, y1, x2, y2 = self.face_detect(frame)
+        drowsy = self.drowsy_detect(frame[y1:y2, x1:x2])
+        return drowsy
     
 class FaceRecognitionModel():
     def __init__(self):
@@ -285,24 +214,3 @@ class FaceRecognitionModel():
                     cv2.rectangle(frame, (left - 10, bottom - 25), (right + 10, bottom + 10), (200, 100, 5), cv2.FILLED)
                     font = cv2.FONT_HERSHEY_DUPLEX
                     cv2.putText(frame, name, (left + 6, bottom - 6), font, .5, (255, 255, 255), 1)
-
-class Centroid():
-    def __init__(self):
-        self.centroid_x, self.centroid_y = 0, 0
-
-    def get_centroid(self, polygon):
-        area = 0
-        self.centroid_x = 0
-        self.centroid_y = 0
-        n = len(polygon)
-
-        for i in range(n):
-            j = (i + 1) % n
-            factor = polygon[i][0] * polygon[j][1] - polygon[j][0] * polygon[i][1]
-            area += factor
-            self.centroid_x += (polygon[i][0] + polygon[j][0]) * factor
-            self.centroid_y += (polygon[i][1] + polygon[j][1]) * factor
-        area /= 2.0
-        if area != 0:
-            self.centroid_x /= (6 * area)
-            self.centroid_y /= (6 * area)
