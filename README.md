@@ -39,9 +39,11 @@
 ![image_720](https://github.com/user-attachments/assets/705c46b3-c18c-4498-9cf0-a5d17c418748)
 
 ### 2.3. 차선 및 객체 인식 시퀀스
+<img src="https://github.com/user-attachments/assets/b2c9e22a-9c23-4ee7-a101-cc7881217aa8" alt="image" width="720" height="482">
 
 ### 2.4. 전체 시나리오 시퀀스
 <img src="https://github.com/user-attachments/assets/cc867796-b1eb-4910-a5ea-62127b9c0281" alt="image" width="720" height="482">
+
 ## 3. 개발 일정 및 역할 분담
 ### 3.1. 이슈별 일정 관리
 ### 3.2. 팀 구성원별 담당 사항
