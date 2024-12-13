@@ -16,8 +16,7 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from AI_Center import ObjectDetection, LaneSegmentation, EmergencyRecognizer
 
-
-print(os.getcwd())
+data_path = "../../../test/data/face/"
 
 path="/CASS_brain/GUI/"
 ui_file = os.path.join(path, "CASS_ui.ui")
@@ -32,7 +31,7 @@ form_register_class = uic.loadUiType(register_file)[0]
 # ESP32_PORT = 8080
 # client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-index = True
+index = False
 
 legCamID = 0 if index else 2
 faceCamID = 2 if index else 0
@@ -45,6 +44,8 @@ class MainWindow(QMainWindow, form_class):
 
         self.setCamThreads()
         self.setStates()
+        self.setLabels()
+        self.setIcons()
         self.setBtns()
 
         self.driver = Driver()
@@ -53,6 +54,11 @@ class MainWindow(QMainWindow, form_class):
 
         self.ath_model = FaceRecognitionModel() # face athentification model
         self.setUserImage()
+        self.FaceDetection = DetectionModel()
+        self.DrowseDetectionModel = DrowseDetectionModel()
+        self.DrowseDetectionModel.get_state_dict(data_path)
+
+
 
         self.detect_model = ObjectDetection('bestDetect.pt')
         self.segment_model = LaneSegmentation('bestSeg.pt')
@@ -61,6 +67,12 @@ class MainWindow(QMainWindow, form_class):
     
         self.setLabelCams()
         self.cameraOn()
+
+        self.lineEdit.returnPressed.connect(self.changeThreshold)
+
+    def changeThreshold(self):
+        self.threshold = self.lineEdit.text()
+        print(self.threshold)
 
     # def setPlots(self):
     #     self.plotDiff = self.findChild(pg.PlotWidget, 'plotDiff')
@@ -74,10 +86,51 @@ class MainWindow(QMainWindow, form_class):
     # def updatePlots(self):
     #     self.data_line = self.plotDiff.plot(self.pen='y')
 
+    def setIcons(self):
+        self.btnForward.setIcon(QIcon("./icons/arrowUp.png"))
+        self.btnRight.setIcon(QIcon("./icons/arrowRight.png"))
+        self.btnLeft.setIcon(QIcon("./icons/arrowLeft.png"))
+        self.btnBackward.setIcon(QIcon("./icons/arrowDown.png"))
+
+        self.labelTrafficLightR.setPixmap(QPixmap("./icons/trafficLightR.jpg"))
+        self.labelTrafficLightG.setPixmap(QPixmap("./icons/trafficLightG.jpg"))
+        self.labelTrafficLight.setPixmap(QPixmap("./icons/trafficLight.jpg"))
+
+        self.labelDynamicObstacleON.setPixmap(QPixmap("./icons/dynamicObstacleOn.jpg"))
+        self.labelDynamicObstacleOFF.setPixmap(QPixmap("./icons/dynamicObstacle.jpg"))
+        self.labelStaticObstacleON.setPixmap(QPixmap("./icons/staticObstacleOn.jpg"))
+        self.labelStaticObstacleOFF.setPixmap(QPixmap("./icons/staticObstacle.jpg"))
+
+        self.labelDirection.setPixmap(QPixmap("./icons/direction.png"))
+        self.labelDirectionBack.setPixmap(QPixmap("./icons/directionBack.png"))
+        self.labelDirectionStraight.setPixmap(QPixmap("./icons/directionStraight.png"))
+        self.labelDirectionLeft.setPixmap(QPixmap("./icons/directionLeft.png"))
+        self.labelDirectionRight.setPixmap(QPixmap("./icons/directionRight.png"))
+
+        self.labelSelectRoad.setPixmap(QPixmap("./icons/selectRoad.png"))
+        self.labelSelectRoadLeft.setPixmap(QPixmap("./icons/selectRoadLeft.png"))
+        self.labelSelectRoadRight.setPixmap(QPixmap("./icons/selectRoadRight.png"))
+
+    def setLabels(self):
+        self.labelTrafficLightR.hide()
+        self.labelTrafficLightG.hide()
+
+        self.labelDynamicObstacleON.hide()
+        self.labelStaticObstacleON.hide()
+
+        self.labelDirectionBack.hide()
+        self.labelDirectionStraight.hide()
+        self.labelDirectionLeft.hide()
+        self.labelDirectionRight.hide()
+
+        self.labelSelectRoadLeft.hide()
+        self.labelSelectRoadRight.hide()
+
     def setStates(self):
         self.duration = 0
         self.maxDiff = 200
         self.count = 0
+        self.threshold = 60
         self.authentified = False
         self.stopFlag = False
         self.isDrive = False
@@ -85,6 +138,17 @@ class MainWindow(QMainWindow, form_class):
         self.isRedLight = False
         self.isGreenLight = False
         self.isRecording = False
+
+        self.isDrowsy1 = False
+        self.isDrowsy2 = False
+
+        self.input_data = {'objects':[], 'direction':None, 'select_road':None}
+        self.UI_objs = {'person':'dynamic', 
+                'obstacle':'static', 
+                'goat':'dynamic',
+                'red_light':'red',
+                'green_light':'green'}
+        self.objs_keys = self.UI_objs.keys()
 
         # Lane Segmentation Parameter
         self.st = time.time()
@@ -98,6 +162,59 @@ class MainWindow(QMainWindow, form_class):
         self.order = None
         self.prev_order = None
         self.curFlag = None
+
+    def push_info(self, cls_list, direction, select_road):
+        # cls_list, direction, select_road = self.input_data.values()
+        self.updateUI(cls_list, direction, select_road)
+
+    def updateUI(self, objs, direction, select_road):     
+        objs = set(objs)
+        objs = [self.UI_objs[obj] for obj in objs if obj in self.objs_keys]
+
+        if 'dynamic' in objs:
+            self.labelDynamicObstacleON.show()
+        else:
+            self.labelDynamicObstacleON.hide()
+        if 'static' in objs:
+            self.labelStaticObstacleON.show()
+        else:
+            self.labelStaticObstacleON.hide()
+
+        if 'red' in objs:
+            self.labelTrafficLightR.show()
+        else:
+            self.labelTrafficLightR.hide()
+        if 'green' in objs:
+            self.labelTrafficLightG.show()
+        else:
+            self.labelTrafficLightG.hide()
+
+        if 'straight' == direction:
+            self.labelDirectionStraight.show()
+        else:
+            self.labelDirectionStraight.hide()
+
+        if 'left' == direction:
+            self.labelDirectionLeft.show()
+        else:
+            self.labelDirectionLeft.hide()
+        if 'right' == direction:
+            self.labelDirectionRight.show()
+        else:
+            self.labelDirectionRight.hide()
+        if 'reverse' == direction:
+            self.labelDirectionBack.show()
+        else:
+            self.labelDirectionBack.hide()
+
+        if 'left' == select_road:
+            self.labelSelectRoadLeft.show()
+        else:
+            self.labelSelectRoadLeft.hide()
+        if 'right' == select_road:
+            self.labelSelectRoadRight.show()
+        else:
+            self.labelSelectRoadRight.hide()
 
     def setBtns(self):
         self.labelRec.hide()
@@ -125,31 +242,32 @@ class MainWindow(QMainWindow, form_class):
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_W:
             self.setDirection("straight")
-            print(event)
         elif event.key() == Qt.Key_A:
             self.setDirection("left")
         elif event.key() == Qt.Key_D:
             self.setDirection("right")
         elif event.key() == Qt.Key_S:
-            self.setDirection("stop")
+            self.setDirection("reverse")
         elif event.key() == Qt.Key_O:
             self.driveState()
+        elif event.key() == Qt.Key_R:
+            self.clickRecord()
+        elif event.key() == Qt.Key_T:
+            self.test()
 
     def setDirection(self, direction):
         self.direction = direction
-        self.labelDirection.setText(direction)
-        print("set direction to the ", direction)
 
     def driveState(self):
         if self.isDrive == False:
             self.isDrive = True
+            self.btnPower.setText("Stop")
         else:
             self.isDrive = False
-
-        print("leg has started driving ? ", self.isDrive)
+            self.btnPower.setText("Drive")
 
     def test(self):
-        print("test env")
+        # print("test env")
         self.btnTest.hide()
         self.btnConnect.hide()
         self.legCamOn()
@@ -169,7 +287,8 @@ class MainWindow(QMainWindow, form_class):
     def updateRecording(self):
         if self.isRecording == True:
             self.count += 1
-            self.writer.write(self.leg_frame)
+            frame = cv2.cvtColor(self.leg_frame, cv2.COLOR_BGR2RGB)
+            self.writer.write(frame)
 
             if self.count % 8 == 0:
                 self.labelRec.hide()
@@ -208,9 +327,9 @@ class MainWindow(QMainWindow, form_class):
         self.btnConnect.hide()
 
     def setCamThreads(self):
-        self.faceCam = Camera()
-        self.faceCam.daemon = True
-        self.faceCam.update.connect(self.updateFaceCam)
+        self.faceCam = Camera() #
+        self.faceCam.daemon = True #
+        self.faceCam.update.connect(self.updateFaceCam) #
 
         self.legCam = Camera()
         self.legCam.daemon = True
@@ -234,8 +353,8 @@ class MainWindow(QMainWindow, form_class):
         '''
         if not self.authentified:
             self.start = time.time()
-            self.faceCam.start()
-            self.faceCam.isRunning = True
+            self.faceCam.start() #
+            self.faceCam.isRunning = True #
             self.faceVideo = cv2.VideoCapture(faceCamID)
             print("camera on")
 
@@ -267,8 +386,11 @@ class MainWindow(QMainWindow, form_class):
         '''
         TODO:need to create user image
         '''
-        self.path = "../../../test/data/face/test_img/img_sb.png"
+        
+        self.path = "../../../test/data/face/my_img/soyoung.png"
         self.name = "soyoung"
+        # self.path = "../../../test/data/face/test_img/img_sb.png"
+        # self.name = "sanghyeok"
 
         self.ath_model.set_user_image(self.path)
         self.ath_model.set_known_user(self.ath_model.my_face_encoding, self.name)
@@ -296,9 +418,10 @@ class MainWindow(QMainWindow, form_class):
             self.registerWindow.hide()
             self.driver_id = self.db.registerUser(name, birth, contact_number)
             QMessageBox.warning(self, "Photo", "정면을 보세요~ 2초 뒤 사진이 촬영됩니다.")
-
-            time.sleep(2)
-            self.createUserImage(self.driver_id, name)
+            
+            if self.duration == 2:
+                self.createUserImage(self.driver_id, name)
+                self.start = time.time()
 
     def createUserImage(self, driver_id, name):
         dir = "../../../test/data/face/register/"
@@ -329,7 +452,7 @@ class MainWindow(QMainWindow, form_class):
         if self.face_names == []:
             self.face_names = ["unknown"]
 
-        if self.face_names[0] == self.name:
+        if self.name in self.face_names:
             if self.authentified == False:
                 self.ath_model.draw_boxes(frame, 
                 self.face_locations, self.face_names)
@@ -339,11 +462,34 @@ class MainWindow(QMainWindow, form_class):
                     QMessageBox.warning(self, "Authentification ", 
                     f"{self.name} Driver Authentification Success.")
                     response = self.TCP.sendMsg(str(self.name))
-                    print(self.name)
                     print("auth response : ", response)
                         
-                    self.labelFaceCam.hide()
+                    # self.labelFaceCam.hide()
                     self.cameraOn()
+
+    def DrowsyDetection(self, frame):
+        try:
+            x1, y1, x2, y2 = self.FaceDetection(frame)
+            predict = self.DrowseDetectionModel(frame[y1:y2, x1:x2])
+
+            if predict == 0:
+                if self.duration > 5:
+                    # self.Drowsy.setStyleSheet("background-color: red")
+                    self.labelLegCam.setStyleSheet("border: 5px solid red")
+                    self.isDrowsy1 = True
+                    # print("drowsy")
+            else:
+                self.start = time.time()
+                # self.Drowsy.setStyleSheet("background-color: green")
+                self.labelLegCam.setStyleSheet("")
+                self.isDrowsy1 = False
+                # print("no drowsy")
+        except:
+            self.start = time.time()
+            self.isDrowsy1 = False
+            # self.Drowsy.setStyleSheet("background-color: white")
+            self.labelFaceCam.setStyleSheet("border: 1px solid white")
+            print("non detection")
 
     def updateFaceCam(self):
         """
@@ -361,11 +507,15 @@ class MainWindow(QMainWindow, form_class):
             if self.authentified == False:
                 self.authentification(frame)
             
-            # else:
-            # self.DrowsyDetection(frame)
+            else:
+                self.DrowsyDetection(frame)
             
-            # if self.isDrowsy1 != self.isDrowsy2:
-                # self.send_Drowsy()
+            if self.isDrowsy1 != self.isDrowsy2:
+                self.TCP.sendMsg("emergency")
+
+            """
+            side_park
+            """
                 
             h, w, c = frame.shape
             qImg = QImage(frame, w, h, w*c, QImage.Format_RGB888)
@@ -446,7 +596,10 @@ class MainWindow(QMainWindow, form_class):
             frame = self.frame.copy()
             h, w, c = frame.shape
             try:
-                order, frame, obstacle = self.detect_model(frame)
+                self.object_detection, frame = self.detect_model(frame)
+                obstacle = self.object_detection["obstacle"]
+                order = self.object_detection["order"]
+                self.cls_list = self.object_detection["cls_list"]
             except:
                 pass
             try:
@@ -454,7 +607,11 @@ class MainWindow(QMainWindow, form_class):
                     # direction : straight, left, right
                     # select_road : center, left, right
                 '''
-                slope, avoid, is_side = self.segment_model(frame, self.direction, self.road, obstacle)
+                self.road_segment = self.segment_model(frame, self.direction, self.road, obstacle)
+                
+                slope = self.road_segment["slope"]
+                avoid = self.road_segment["avoid"]
+                is_side = self.road_segment["is_side"]
 
                 if not(is_side) and self.road != 'center':
                     self.road = 'center'
@@ -478,25 +635,28 @@ class MainWindow(QMainWindow, form_class):
                         self.check = True
             except:
                 pass
-                
+            response = 'drive'
             if self.isDrive == True:
-                if order == 'straight' or order == 'Avoidance':
+                if order == 'drive':
                     try:
+
                         if slope:
-                            th = 30
+                            th = self.threshold
                             th_r = th/2
                             th_l = - (th/2)
 
-                            if slope < th_l or slope > th_r :
+                            if slope > th_l and slope < th_r :
                                 response = "drive"
                             elif slope > th_r:
                                 response = "R1"
                                 if slope > th_r + th:
                                     response = "R2"
+
                             elif slope < th_l:
                                 response = "L1"
                                 if slope < th_l - th:
                                     response = "L2"
+
                         else:
                             response = "drive"
                     except:
@@ -507,13 +667,14 @@ class MainWindow(QMainWindow, form_class):
             else:
                 response = "stop"
 
+
             if response != self.curFlag and response != "no driveway":
-                print("response : ", response)
                 self.curFlag = response
                 self.TCP.sendMsg(response)
             
             self.labelState.setText(response)
             self.labelDirection.setText(self.direction)
+            self.push_info(self.cls_list, self.direction, self.road_select)
 
             self.leg_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             qImg = QImage(self.leg_frame, w, h, w*c, QImage.Format_RGB888)
