@@ -45,7 +45,7 @@ class MainWindow(QMainWindow, form_class):
         self.TCP = TCP()
 
         self.ath_model = FaceRecognitionModel() # face athentification model
-        self.setUserImage()
+        self.setDriverImage()
         self.drowsy_model = DrowseDetection('bestFace.pth')
         self.detect_model = ObjectDetection('bestDetect.pt')
         self.segment_model = LaneSegmentation('bestSeg.pt')
@@ -66,7 +66,7 @@ class MainWindow(QMainWindow, form_class):
         # self.reader, self.writer = asyncio(self.connect_async())
         asyncio.ensure_future(self.connect_async())
 
-        self.threshold = 45
+        self.threshold = 40
         self.threshold_2 = 5
         self.gear = "R1"
         self.lineEdit.returnPressed.connect(self.changeThreshold)
@@ -247,10 +247,12 @@ class MainWindow(QMainWindow, form_class):
 
         if 'left' == select_road:
             self.labelSelectRoadLeft.show()
+            print(select_road)
         else:
             self.labelSelectRoadLeft.hide()
         if 'right' == select_road:
             self.labelSelectRoadRight.show()
+            print("select_road : ", select_road)
         else:
             self.labelSelectRoadRight.hide()
 
@@ -298,30 +300,38 @@ class MainWindow(QMainWindow, form_class):
         """
 
         if event.key() == Qt.Key_W:
-            if self.isDrive == False:
-                self.sendMsg("drive")
-                print("send drive")
-            else:
-                self.setDirection("straight")
-                print("direction straight")
+            # if self.isDrive == False:
+            #     self.sendMsg("drive")
+            #     print("send drive")
+            # else:
+            #     self.setDirection("straight")
+            #     print("direction straight")
+
+            self.setDirection("straight")
 
         elif event.key() == Qt.Key_A:
-            if self.isDrive == False:
-                self.sendMsg("L2")
-            else:
-                self.setDirection("left")
+            # if self.isDrive == False:
+            #     self.sendMsg("L2")
+            # else:
+            #     self.setDirection("left")
+
+            self.setDirection("left")
 
         elif event.key() == Qt.Key_D:
-            if self.isDrive == False:
-                self.sendMsg("R2")
-            else:
-                self.setDirection("right")
+            # if self.isDrive == False:
+            #     self.sendMsg("R2")
+            # else:
+            #     self.setDirection("right")
+
+            self.setDirection("right")
 
         elif event.key() == Qt.Key_S:
-            if self.isDrive == False:
-                self.isDrive = True
+            if self.isDrive == True:
+                self.isDrive = False
             else:
                 self.sendMsg("reverse")
+                self.isDrive = False
+                print("send reverse")
 
         elif event.key() == Qt.Key_O:
             self.driveState()
@@ -349,10 +359,13 @@ class MainWindow(QMainWindow, form_class):
         if self.isDrive == False:
             self.isDrive = True
             self.btnPower.setText("Stop")
+            self.sendMsg("accel")
+            self.sendMsg("accel")
+            self.sendMsg("accel")
+            print("try to send accel")
         else:
             self.isDrive = False
             self.btnPower.setText("Drive")
-            self.sendMsg("drive")
 
     def test(self):
         # print("test env")
@@ -410,6 +423,19 @@ class MainWindow(QMainWindow, form_class):
             self.writer.release()
             self.labelRec.hide()
 
+    def setDriverImage(self):
+        path_dir = "../../../test/data/face/register"
+        file_name = os.listdir(path_dir)
+        path_name = file_name[0][:-4]
+        '''
+        TODO:need to create user image
+        '''
+        self.path = "../../../test/data/face/my_img/soyoung.png"
+        self.name = "soyoung"
+
+        self.ath_model.set_user_image(self.path)
+        self.ath_model.set_known_user(self.ath_model.my_face_encoding, self.name)
+
     def connectLeg(self):
         asyncio.ensure_future(self.connect_async())
         self.btnConnect.hide()
@@ -418,7 +444,7 @@ class MainWindow(QMainWindow, form_class):
         self.faceCam = Thread() #
         self.faceCam.daemon = True #
         self.faceCam.update.connect(self.updateFaceCam) #
-        self.faceCam.update.connect(self.emergencyDetection)
+        # self.faceCam.update.connect(self.emergencyDetection)
 
         self.legCam = Thread()
         self.legCam.daemon = True
@@ -506,12 +532,12 @@ class MainWindow(QMainWindow, form_class):
             if predict == 0:
                 if self.duration > 4:
                     self.isDrowsy1 = True
-                    if self.isRecording == False:
-                        print("record on")
-                        self.clickRecord()
-                        """
-                        TODO: log to DB
-                        """
+                    # if self.isRecording == False:
+                        # print("record on")
+                        # self.clickRecord()
+                        # """
+                        # TODO: log to DB
+                        # """
                     if self.duration > 7:
                         if self.Drowsy1 != self.Drowsy2:
                             self.labelLegCam.setStyleSheet("border: 5px solid red")
@@ -521,8 +547,8 @@ class MainWindow(QMainWindow, form_class):
                 self.start = time.time()
                 self.labelLegCam.setStyleSheet("")
                 self.isDrowsy1 = False
-                if self.isRecording == True:
-                    self.clickRecord()
+                # if self.isRecording == True:
+                #     self.clickRecord()
         except:
             self.start = time.time()
             self.isDrowsy1 = False
@@ -541,11 +567,11 @@ class MainWindow(QMainWindow, form_class):
             self.end = time.time()
             self.duration = self.end - self.start
 
-            if self.authentified == False:
-                self.authentification(frame)
+            # if self.authentified == False:
+            #     self.authentification(frame)
             
-            else:
-                self.drowsyDetection(frame)
+            # else:
+            #     self.drowsyDetection(frame)
 
             h, w, c = frame.shape
             qImg = QImage(frame, w, h, w*c, QImage.Format_RGB888)
@@ -606,7 +632,7 @@ class MainWindow(QMainWindow, form_class):
                 if order == 'drive':
                     try:
                         if slope:
-                            print(slope)
+                            # print(slope)
                             th = self.threshold
                             th_2 = self.threshold_2
                             th_r = th
@@ -614,12 +640,12 @@ class MainWindow(QMainWindow, form_class):
 
                             if slope > th_l and slope < th_r :
                                 response = "drive"
-                                print("drive")
+                                # print("drive")
                             elif slope > th_r:
                                 response = "R1"
                                 if slope > th_r + 20:
                                     response = "R3"
-                                    print(slope, response)
+                                    # print(slope, response)
 
                             elif slope < th_l:
                                 response = "L1"
@@ -631,7 +657,8 @@ class MainWindow(QMainWindow, form_class):
                         else:
                             response = "drive"
                     except:
-                        response = "no driveway"
+                        # response = "no driveway"
+                        response = response
                 else:
                     response = "stop"
             else:
@@ -640,8 +667,9 @@ class MainWindow(QMainWindow, form_class):
             # if self.stopFlag == False:
             message = self.TCP.encodeMsg(response)
             self.sendMsg(message)
+            
             # print(message)
-            # self.labelState.setText(response)
+            self.labelState.setText(response)
 
             # if response != self.curFlag and response != "no driveway":
             #     self.curFlag = response

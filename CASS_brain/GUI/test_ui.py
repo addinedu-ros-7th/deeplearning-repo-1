@@ -6,15 +6,12 @@ from Modules import *
 
 import os 
 import time
-import glob
 import cv2
 import sys
-import socket
-# import pyqtgraph as pg
 from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from AI_Center import ObjectDetection, LaneSegmentation, EmergencyRecognizer
+from AI_Center import *
 
 data_path = "../../../test/data/face/"
 
@@ -54,17 +51,13 @@ class MainWindow(QMainWindow, form_class):
 
         self.ath_model = FaceRecognitionModel() # face athentification model
         self.setUserImage()
-        self.FaceDetection = DetectionModel()
-        self.DrowseDetectionModel = DrowseDetectionModel()
-        self.DrowseDetectionModel.get_state_dict(data_path)
-
-
-
+        self.drowsy_model = DrowseDetection('bestFace.pth')
         self.detect_model = ObjectDetection('bestDetect.pt')
         self.segment_model = LaneSegmentation('bestSeg.pt')
         self.emergency_model = EmergencyRecognizer().cuda()
-        self.emergency_model.load_state_dict(torch.load('bestEmergency.pt'))
-    
+        self.emergency_model.load_state_dict(torch.load('emergency.pt'))
+        self.emergency_model.RTparameter_setting()
+
         self.setLabelCams()
         self.cameraOn()
 
@@ -287,8 +280,8 @@ class MainWindow(QMainWindow, form_class):
     def updateRecording(self):
         if self.isRecording == True:
             self.count += 1
-            frame = cv2.cvtColor(self.leg_frame, cv2.COLOR_BGR2RGB)
-            self.writer.write(frame)
+            # frame = cv2.cvtColor(self.leg_frame, cv2.COLOR_BGR2RGB)
+            # self.writer.write(frame)
 
             if self.count % 8 == 0:
                 self.labelRec.hide()
@@ -322,21 +315,19 @@ class MainWindow(QMainWindow, form_class):
             self.labelRec.hide()
 
     def connectLeg(self):
-        self.TCP.connectLeg()
-        self.TCP.sendMsg("connect")
         self.btnConnect.hide()
 
     def setCamThreads(self):
-        self.faceCam = Camera() #
+        self.faceCam = Thread() #
         self.faceCam.daemon = True #
         self.faceCam.update.connect(self.updateFaceCam) #
 
-        self.legCam = Camera()
+        self.legCam = Thread()
         self.legCam.daemon = True
         self.legCam.update.connect(self.updateLegCam2)
         # self.legCam.update.connect(self.updatePlots)
 
-        self.record = Camera()
+        self.record = Thread()
         self.record.daemon = True
         self.record.update.connect(self.updateRecording)
     
@@ -369,9 +360,6 @@ class MainWindow(QMainWindow, form_class):
         '''
         in case not using face_recognition
         '''
-        message = self.name
-        response = self.TCP.sendMsg(message)
-
         self.labelFaceCam.hide()
         self.legCam.start()
         self.legCam.isRunning = True
@@ -386,11 +374,8 @@ class MainWindow(QMainWindow, form_class):
         '''
         TODO:need to create user image
         '''
-        
         self.path = "../../../test/data/face/my_img/soyoung.png"
         self.name = "soyoung"
-        # self.path = "../../../test/data/face/test_img/img_sb.png"
-        # self.name = "sanghyeok"
 
         self.ath_model.set_user_image(self.path)
         self.ath_model.set_known_user(self.ath_model.my_face_encoding, self.name)
@@ -461,35 +446,39 @@ class MainWindow(QMainWindow, form_class):
                     self.authentified = True
                     QMessageBox.warning(self, "Authentification ", 
                     f"{self.name} Driver Authentification Success.")
-                    response = self.TCP.sendMsg(str(self.name))
-                    print("auth response : ", response)
-                        
-                    # self.labelFaceCam.hide()
                     self.cameraOn()
 
     def DrowsyDetection(self, frame):
+        """
+        if driver is drowsy, turn a camera on 
+        if driver is drowsy for (5 secs), control CASS_leg for wake up driver
+        """
         try:
-            x1, y1, x2, y2 = self.FaceDetection(frame)
-            predict = self.DrowseDetectionModel(frame[y1:y2, x1:x2])
+            predict = self.drowsy_model(frame)
 
             if predict == 0:
-                if self.duration > 5:
-                    # self.Drowsy.setStyleSheet("background-color: red")
-                    self.labelLegCam.setStyleSheet("border: 5px solid red")
+                if self.duration > 4:
                     self.isDrowsy1 = True
-                    # print("drowsy")
+                    if self.isRecording == False:
+                        print("record on")
+                        self.clickRecord()
+                        """
+                        TODO: log to DB
+                        """
+                    if self.duration > 7:
+                        if self.Drowsy1 != self.Drowsy2:
+                            self.labelLegCam.setStyleSheet("border: 5px solid red")
+                            self.print("emergency")
             else:
                 self.start = time.time()
-                # self.Drowsy.setStyleSheet("background-color: green")
                 self.labelLegCam.setStyleSheet("")
                 self.isDrowsy1 = False
-                # print("no drowsy")
+                if self.isRecording == True:
+                    self.clickRecord()
         except:
             self.start = time.time()
             self.isDrowsy1 = False
-            # self.Drowsy.setStyleSheet("background-color: white")
             self.labelFaceCam.setStyleSheet("border: 1px solid white")
-            print("non detection")
 
     def updateFaceCam(self):
         """
@@ -510,8 +499,8 @@ class MainWindow(QMainWindow, form_class):
             else:
                 self.DrowsyDetection(frame)
             
-            if self.isDrowsy1 != self.isDrowsy2:
-                self.TCP.sendMsg("emergency")
+            # if self.isDrowsy1 != self.isDrowsy2:
+            #     print("drowsy changed emergency")
 
             """
             side_park
@@ -532,23 +521,19 @@ class MainWindow(QMainWindow, form_class):
             diff_x = self.segment_model(frame)
             detect_list = self.detect_model.get_distance(frame)
 
-            
-            # if len(detect_list) != 0:
-            #     print(detect_list)
-
             if self.isPersonAppear == False:
                 if "person"  in detect_list:
-                    response = self.TCP.sendMsg("stop")
+                    # response = self.TCP.sendMsg("stop")
                     self.isPersonAppear = True
 
             else:
                 if "person" not in detect_list:
-                    response = self.TCP.sendMsg("drive")
+                    # response = self.TCP.sendMsg("drive")
                     self.isPersonAppear = False
 
             if self.isRedLight == False:
                 if "red_light" in detect_list:
-                    response = self.TCP.sendMsg("stop")
+                    # response = self.TCP.sendMsg("stop")
                     self.isRedLight = True
                     self.isGreenLight = False
 
@@ -559,24 +544,24 @@ class MainWindow(QMainWindow, form_class):
 
             if self.isGreenLight == False:
                 if "green_light" in detect_list:
-                    response = self.TCP.sendMsg("drive")
+                    # response = self.TCP.sendMsg("drive")
                     self.isGreenLight = True
                     self.isRedLight = False
 
-            if diff_x:
+            # if diff_x:
                 # print("diff_x : ", diff_x)
 
-                if self.isPersonAppear == False:
-                    if diff_x == 0:
-                        response = self.TCP.sendMsg("drive")
-                    elif diff_x > 50:
-                        response = self.TCP.sendMsg("R1")
-                        if diff_x > 180:
-                            response = self.TCP.sendMsg("R2")
-                    elif diff_x < 50:
-                        response = self.TCP.sendMsg("L1")
-                        if diff_x < -180:
-                            response = self.TCP.sendMsg("L2")
+                # if self.isPersonAppear == False:
+                #     if diff_x == 0:
+                #         # response = self.TCP.sendMsg("drive")
+                #     elif diff_x > 50:
+                #         # response = self.TCP.sendMsg("R1")
+                #         if diff_x > 180:
+                #             # response = self.TCP.sendMsg("R2")
+                #     elif diff_x < 50:
+                #         # response = self.TCP.sendMsg("L1")
+                #         if diff_x < -180:
+                #             # response = self.TCP.sendMsg("L2")
 
                 # data_line = self.plotDiff.plot(diff_x, pen='k', width=2)
                 # print(data_line)
@@ -670,7 +655,7 @@ class MainWindow(QMainWindow, form_class):
 
             if response != self.curFlag and response != "no driveway":
                 self.curFlag = response
-                self.TCP.sendMsg(response)
+                # self.TCP.sendMsg(response)
             
             self.labelState.setText(response)
             self.labelDirection.setText(self.direction)

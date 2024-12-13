@@ -2339,19 +2339,6 @@ p, li { white-space: pre-wrap; }
      <string>test</string>
     </property>
    </widget>
-   <widget class="QLabel" name="labelDirectionStr">
-    <property name="geometry">
-     <rect>
-      <x>990</x>
-      <y>540</y>
-      <width>101</width>
-      <height>31</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Direction</string>
-    </property>
-   </widget>
    <widget class="QPushButton" name="btnRegister">
     <property name="geometry">
      <rect>
@@ -2382,7 +2369,7 @@ p, li { white-space: pre-wrap; }
     <property name="geometry">
      <rect>
       <x>990</x>
-      <y>460</y>
+      <y>440</y>
       <width>101</width>
       <height>31</height>
      </rect>
@@ -2395,29 +2382,13 @@ p, li { white-space: pre-wrap; }
     <property name="geometry">
      <rect>
       <x>1000</x>
-      <y>430</y>
+      <y>420</y>
       <width>91</width>
       <height>31</height>
      </rect>
     </property>
     <property name="text">
      <string>State</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
-   <widget class="QLabel" name="labelDirectionInfo">
-    <property name="geometry">
-     <rect>
-      <x>990</x>
-      <y>500</y>
-      <width>101</width>
-      <height>31</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Direction</string>
     </property>
     <property name="alignment">
      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -9621,9 +9592,9 @@ p, li { white-space: pre-wrap; }
    <widget class="QLineEdit" name="lineEdit">
     <property name="geometry">
      <rect>
-      <x>980</x>
+      <x>1022</x>
       <y>580</y>
-      <width>113</width>
+      <width>71</width>
       <height>26</height>
      </rect>
     </property>
@@ -9632,6 +9603,84 @@ p, li { white-space: pre-wrap; }
     </property>
     <property name="text">
      <string/>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="lineEdit_2">
+    <property name="geometry">
+     <rect>
+      <x>1022</x>
+      <y>540</y>
+      <width>71</width>
+      <height>26</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label">
+    <property name="geometry">
+     <rect>
+      <x>980</x>
+      <y>590</y>
+      <width>31</width>
+      <height>18</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>th</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_2">
+    <property name="geometry">
+     <rect>
+      <x>980</x>
+      <y>540</y>
+      <width>41</width>
+      <height>18</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>gear</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="lineEdit_3">
+    <property name="geometry">
+     <rect>
+      <x>1022</x>
+      <y>610</y>
+      <width>71</width>
+      <height>26</height>
+     </rect>
+    </property>
+    <property name="inputMask">
+     <string/>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_3">
+    <property name="geometry">
+     <rect>
+      <x>980</x>
+      <y>620</y>
+      <width>31</width>
+      <height>18</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>th_2</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="labelReceive">
+    <property name="geometry">
+     <rect>
+      <x>1020</x>
+      <y>500</y>
+      <width>71</width>
+      <height>18</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>receiving</string>
     </property>
    </widget>
    <zorder>labelLegCam</zorder>
@@ -9645,12 +9694,10 @@ p, li { white-space: pre-wrap; }
    <zorder>btnConnect</zorder>
    <zorder>btnCamOn</zorder>
    <zorder>btnTest</zorder>
-   <zorder>labelDirectionStr</zorder>
    <zorder>btnRegister</zorder>
    <zorder>btnRec</zorder>
    <zorder>labelState</zorder>
    <zorder>labelStateInfo</zorder>
-   <zorder>labelDirectionInfo</zorder>
    <zorder>labelRec</zorder>
    <zorder>labelStaticObstacleOFF</zorder>
    <zorder>labelStaticObstacleON</zorder>
@@ -9669,6 +9716,12 @@ p, li { white-space: pre-wrap; }
    <zorder>labelDirectionBack</zorder>
    <zorder>labelDirectionStraight</zorder>
    <zorder>lineEdit</zorder>
+   <zorder>lineEdit_2</zorder>
+   <zorder>label</zorder>
+   <zorder>label_2</zorder>
+   <zorder>lineEdit_3</zorder>
+   <zorder>label_3</zorder>
+   <zorder>labelReceive</zorder>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
