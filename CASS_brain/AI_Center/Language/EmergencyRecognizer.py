@@ -1,4 +1,3 @@
-import os
 import torch
 import torchaudio
 import torchaudio.transforms as transforms
@@ -9,7 +8,7 @@ import numpy as np
 
 # 모델 정의 (간단한 CNN 모델)
 class EmergencyRecognizer(nn.Module):
-    def __init__(self, input_size, n_classes):
+    def __init__(self, input_size=40, n_classes=2):
         super(EmergencyRecognizer, self).__init__()
         self.set_params(input_size=input_size, n_classes=n_classes)
         

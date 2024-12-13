@@ -1,2 +1,3 @@
 from .Detection.Object_detection import ObjectDetection
 from .Segmentation.Lane_segmentation import LaneSegmentation
+from .Language.EmergencyRecognizer import EmergencyRecognizer
