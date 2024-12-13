@@ -45,8 +45,18 @@
 <img src="https://github.com/user-attachments/assets/cc867796-b1eb-4910-a5ea-62127b9c0281" alt="image" width="720" height="482">
 
 ## 3. 개발 일정 및 역할 분담
+
 ### 3.1. 이슈별 일정 관리
+<img src="https://github.com/user-attachments/assets/9999d611-5074-4ba5-9bbf-72c63a3fbe73" alt="image" width="720" height="482">
+
 ### 3.2. 팀 구성원별 담당 사항
+|구분|이름|업무|
+|---|---|---|
+|팀장|이상범|----|
+|팀원|윤희태|----|
+|팀원|김소영|----|
+|팀원|윤민섭|----|
+|팀원|장윤정|----|
 
 ## 4. 결과
 ### 4.1. 상세 구현 결과
