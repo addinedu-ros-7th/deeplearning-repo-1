@@ -105,14 +105,11 @@ class LaneSegmentation(nn.Module):
         road = np.concatenate(road, axis=0)
         road = road[road[:, -1].argsort()]
         if direction == 'left':
-            slope = road[-1]
             road = road[0][:2]
         elif direction == 'right':
-            slope = road[-1]
             road = road[-1][:2]
         else:
             if len(road) > 2:
-                slope = road[:,-1].mean(0)
                 road = road[1:-1][:2].mean(0).astype(np.int32)
             else:
                 slope = road[:,-1]
@@ -125,11 +122,11 @@ class LaneSegmentation(nn.Module):
 
         if obstackle is not None:
             avoid = self.is_point_in_bbox(road, obstackle)
-
-        cv2.arrowedLine(frame, start_point, road,
+        cv2.arrowedLine(frame, start_point, road[:2],
                             color=(0, 0, 0), 
                             thickness=5, tipLength=0.1)
-        self.data = {'slope':slope[0], 'avoid':avoid, 'is_side':is_side}
+        slope = -(start_point[0] - road[0])/(start_point[1] - road[1])
+        slope = round(np.rad2deg(np.arctan(slope)))
+        self.data = {'slope':slope, 'avoid':avoid, 'is_side':is_side}
         return self.data
     
-

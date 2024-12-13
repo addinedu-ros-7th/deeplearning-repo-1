@@ -14,7 +14,7 @@ import socket
 from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from AI_Center import ObjectDetection, LaneSegmentation
+from AI_Center import ObjectDetection, LaneSegmentation, EmergencyRecognizer
 
 data_path = "../../../test/data/face/"
 
@@ -62,6 +62,8 @@ class MainWindow(QMainWindow, form_class):
 
         self.detect_model = ObjectDetection('bestDetect.pt')
         self.segment_model = LaneSegmentation('bestSeg.pt')
+        self.emergency_model = EmergencyRecognizer().cuda()
+        self.emergency_model.load_state_dict(torch.load('bestEmergency.pt'))
     
         self.setLabelCams()
         self.cameraOn()
