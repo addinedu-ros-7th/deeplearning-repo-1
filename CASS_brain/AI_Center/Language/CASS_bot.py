@@ -25,6 +25,8 @@ import re
 from datetime import datetime
 import warnings
 
+# 모든 경고 무시
+warnings.filterwarnings("ignore")  
 
 class CASS_BOT(nn.Module):
     def __init__(self):
@@ -192,10 +194,7 @@ class CASS_BOT(nn.Module):
             self.user_input = ""
 
 
-if __name__ == "__main__":
-    # 모든 경고 무시
-    warnings.filterwarnings("ignore")   
-
+if __name__ == "__main__": 
     print("'s' 키를 눌러 음성 명령, 다시 's' 키를 눌러 명령 종료")
     print("시스템 종료는 'q' 키를 누르세요.")
     print("=" * 50)
