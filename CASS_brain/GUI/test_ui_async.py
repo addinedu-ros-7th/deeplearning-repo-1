@@ -23,7 +23,7 @@ form_register_class = uic.loadUiType(register_file)[0]
 ESP32_IP = "192.168.0.28"
 ESP32_PORT = 8080
 
-index = False
+index = True
 
 legCamID = 0 if index else 2
 faceCamID = 2 if index else 0
@@ -263,7 +263,7 @@ class MainWindow(QMainWindow, form_class):
 
     def setBtns(self):
         self.labelRec.hide()
-        self.labelVoice.hide()
+        self.labelThread.hide()
         self.btnRegister.hide()
 
         self.btnRec.clicked.connect(self.clickRecord)
@@ -371,13 +371,13 @@ class MainWindow(QMainWindow, form_class):
     def voiceAuthentification(self):
         # print(self.authentified)
         if self.authentified == False:
-            self.labelVoice.show()
-            self.labelVoice.setText("주행자 인증을 위한 3초 음성인식을 시작합니다.")
+            self.labelThread.show()
+            self.labelThread.setText("주행자 인증을 위한 3초 음성인식을 시작합니다.")
             time.sleep(0.4)
             result = self.updateVoiceIdModel()
             print(result)
             if result == True:
-                self.labelVoice.hide()
+                self.labelThread.hide()
                 self.authentified = True
                 QMessageBox.information(self, "Voice Authentification", "주행자 인증이 완료되었습니다.")
                 message = self.TCP.encodeMsg(self.name)
@@ -704,11 +704,11 @@ class MainWindow(QMainWindow, form_class):
 
             if self.isDrive == True:
                 if order == 'drive':
+                    if "red_light" in self.cls_list:
+                        self.ab_order = "stop"
+                    elif "green_light" in self.cls_list:
+                        self.ab_order = "drive"
                     try:
-                        if "red_light" in self.cls_list:
-                            self.ab_order = "stop"
-                        elif "green_light" in self.cls_list:
-                            self.ab_order = "drive"
 
                         if slope:
                             # print(slope)
@@ -753,19 +753,21 @@ class MainWindow(QMainWindow, form_class):
 
             # if self.select_road == "side_park":
             #     response = "side_parking"
+            if response == "no driveway":
+                response = "reverse"
                 
             self.labelState.setText(response)
 
-            if response != self.curFlag and response != "no driveway":
+            if response != self.curFlag: # and response != "no driveway":
                 self.curFlag = response
                 message = self.TCP.encodeMsg(response)
                 self.sendMsg(message)
-                print(message)
+                print(response)
 
-            self.count += 1
-            if self.count % 10 == 0:
-                message = self.TCP.encodeMsg(response)
-                self.sendMsg(message)
+            # self.count += 1
+            # if self.count % 10 == 0:
+            #     message = self.TCP.encodeMsg(response)
+            #     self.sendMsg(message)
             
             self.updateUI(self.cls_list, self.direction, self.select_road)
             self.label
