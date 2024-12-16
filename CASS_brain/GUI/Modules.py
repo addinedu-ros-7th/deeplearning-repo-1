@@ -39,33 +39,35 @@ class TCP():
     def encodeMsg(self, msg):
         match(msg):
             case "connect":
-                self.message = "11"
+                self.message = "11\n"
             case "soyoung": # user_name
-                self.message = "21"
+                self.message = "21\n"
             case "drive":
-                self.message = "31"
+                self.message = "31\n"
             case "stop":
-                self.message = "32"
+                self.message = "32\n"
             case "reverse":
-                self.message = "33"
+                self.message = "33\n"
             case "accel":
-                self.message = "34"
+                self.message = "34\n"
                 print("accel sent")
         
             case "L1":
-                self.message = "41"
+                self.message = "41\n"
             case "L2":
-                self.message = "42"
+                self.message = "42\n"
             case "L3":
-                self.message = "43"
+                self.message = "43\n"
             case "R1":
-                self.message = "51"
+                self.message = "51\n"
             case "R2":
-                self.message = "52"
+                self.message = "52\n"
             case "R3":
-                self.message = "53"
+                self.message = "53\n"
+            case "side_parking":
+                self.message = "88\n"
             case "emergency":
-                self.message = "99"
+                self.message = "99\n"
         
         return self.message
 
@@ -73,17 +75,20 @@ class DataBase():
     def __init__(self):
         self.local = None
 
-    def connectLocal(self):
+    def connectLocal(self, password):
         self.local = mysql.connector.connect(
             host = "localhost",
             user = "root",
-            password = "0050",
+            password = password,
             database = "CASS"
         )
+    def closeLocal(self):
+        self.local.close()
 
     def fetchUserData(self, path):
         self.cur = self.local.cursor(buffered=True)
-        self.cur.execute(f"SELECT * WHERE path = {path} FROM DRIVER")
+        sql = "SELECT * FROM DRIVER WHERE path = %s"
+        self.cur.execute(sql, (path))
         data = self.cur.fetchall()
         driver_id = data[0][0]
         driver_name = data[0][1]
@@ -99,10 +104,9 @@ class DataBase():
         self.cur.execute(sql, val)
         self.local.commit()
         sql_id = "select id from DRIVER order by id desc limit 1"
-        print(sql_id)
         self.cur.execute(sql_id)
         driver_id = self.cur.fetchone()[0]
-        print("registere success :", driver_id)
+        print("registere success, driver id :", driver_id)
 
         return driver_id
 
@@ -113,7 +117,7 @@ class DataBase():
         self.cur.execute(sql, val)
         self.local.commit()
 
-        print("registere success :", path)
+        print("registere success, photo path :", path)
 
 class Driver():
     def __init__(self):

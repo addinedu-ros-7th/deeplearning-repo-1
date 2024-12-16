@@ -38,6 +38,7 @@ class MainWindow(QMainWindow, form_class):
 
         self.driver = Driver()
         self.db = DataBase()
+        self.db.connectLocal("0050")
         self.TCP = TCP()
 
         self.setAiModels()
@@ -352,7 +353,7 @@ class MainWindow(QMainWindow, form_class):
     def setLabelCams(self):
         self.labelRec.hide()
 
-        self.width, self.height = self.labelFace.width(), self.labelFace.height()
+        self.width, self.height = self.labelFaceCam.width(), self.labelFaceCam.height()
         self.facePixmap = QPixmap(self.width, self.height)
 
         self.w, self.h = self.labelLegCam.width(), self.labelLegCam.height()
@@ -362,14 +363,14 @@ class MainWindow(QMainWindow, form_class):
         '''
         turn a camera on when driver authentification is success
         '''
-        if not self.athentified:
+        if not self.authentified:
             self.start = time.time()
             self.faceCam.start()
             self.faceCam.isRunning = True
             self.faceVideo = cv2.VideoCapture(faceCamID)
             print("face camera on")
 
-        elif self.athentified:
+        elif self.authentified:
             self.labelFace.hide()
             print("authentification success")
             self.legCam.start()
@@ -446,15 +447,13 @@ class MainWindow(QMainWindow, form_class):
         self.registerWindow.btnReturn.clicked.connect(self.returnMain)
         self.registerWindow.editContactNumber.textChanged.connect(self.legExCheck)
         self.registerWindow.show()
-        self.db.connectLocal()
 
     def createDriverImage(self, driver_id, name):
         img_path = "../../CASS_driving_log/driverImg/"
         os.makedirs(img_path, exist_ok=True)
-        self.path = str(driver_id) + name
-        cv2.imwrite(img_path + self.path + ".png", cv2.cvtColor(self.face_frame, cv2.COLOR_BGR2RGB))
+        self.path = str(driver_id) + name + ".png"
+        cv2.imwrite(img_path + self.path, self.face_frame)
         self.db.registerPhoto(driver_id, self.path)
-        self.db.local.close()
 
     def driverRegister(self):
         name = self.registerWindow.editName.text()
@@ -469,11 +468,11 @@ class MainWindow(QMainWindow, form_class):
             self.driver.getInfo(name, birth, contact_number)
             self.registerWindow.hide()
             self.driver_id = self.db.registerUser(name, birth, contact_number)
-            QMessageBox.warning(self, "Photo", "정면을 보세요~ 2초 뒤 사진이 촬영됩니다.")
-            
-            if self.duration == 2:
-                self.createDriverImage(self.driver_id, name)
-                self.start = time.time()
+            QMessageBox.warning(self, "Photo", "정면을 보세요~ 3초 뒤 사진이 촬영됩니다.")
+            time.sleep(2)
+            self.createDriverImage(self.driver_id, name)
+            self.setDriverImage()
+            print(self.name, self.path)
 
     def legExCheck(self):
         tmp = self.registerWindow.editContactNumber.text()
@@ -488,11 +487,6 @@ class MainWindow(QMainWindow, form_class):
     def returnMain(self):
         self.registerWindow.hide()
 
-    def fetchDriverInfo(self):
-        self.db.connectLocal()
-        self.driver.id, self.driver.name, \
-            self.driver.birth, self.driver.contact = self.db.fetchUser(self.path)
-    
     # driver authentification
     def setDriverImage(self):
         '''
@@ -500,12 +494,21 @@ class MainWindow(QMainWindow, form_class):
         '''
         img_path = "../../CASS_driving_log/driverImg/"
         img = os.listdir(img_path)
-        self.path = img
-        self.fetchDriverinfo()
-        self.name = self.driver.name
+        print("imgs", img)
 
-        self.authentification_model.set_user_image(self.path)
-        self.authentification_model.set_known_user(self.authentification_model.my_face_encoding, self.name)
+        if img:
+            self.path = img[0]
+            path = [self.path]
+            
+            self.driver.id, self.driver.name, \
+            self.driver.birth, self.driver.contact = self.db.fetchUserData(path)
+
+            self.name = self.driver.name
+
+            self.authentification_model.set_user_image(img_path + self.path)
+            self.authentification_model.set_known_user(self.authentification_model.my_face_encoding, self.name)
+        else:
+            self.register()
 
     def authentification(self, frame):
         '''
@@ -527,7 +530,7 @@ class MainWindow(QMainWindow, form_class):
                     f"{self.name} Driver Authentification Success.")
                     self.sendMsg(self.name)
                         
-                    self.labelFace.hide()
+                    # self.labelFaceCam.hide()
                     self.cameraOn()
 
     def drowsyDetection(self, frame):
@@ -580,14 +583,14 @@ class MainWindow(QMainWindow, form_class):
             self.end = time.time()
             self.duration = self.end - self.start
 
-            # if self.authentified == False:
-            #     self.authentification(frame)
+            if self.authentified == False:
+                self.authentification(frame)
             
-            # else:
-            #     self.drowsyDetection(frame)
+            else:
+                self.drowsyDetection(frame)
             
-            # if self.isDrowsy1 != self.isDrowsy2:
-            #     self.sendMsg("emergency")
+            if self.isDrowsy1 != self.isDrowsy2:
+                self.sendMsg("emergency")
 
             """
             TODO: side_park
@@ -681,8 +684,8 @@ class MainWindow(QMainWindow, form_class):
             else:
                 response = "stop"
 
-            message = self.TCP.encodeMsg(response)
-            self.sendMsg(message)
+            # message = self.TCP.encodeMsg(response)
+            self.sendMsg(response)
             self.updateUI(self.cls_list, self.direction, self.road_select)
 
             self.leg_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -700,3 +703,5 @@ if __name__ == "__main__":
     loop.run_until_complete(asyncio.ensure_future(asyncio.sleep(0)))
 
     sys.exit(app.exec_())
+    window.close_connection()
+    window.db.closeLocal()
