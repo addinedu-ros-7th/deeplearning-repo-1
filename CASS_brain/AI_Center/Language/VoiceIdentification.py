@@ -174,11 +174,13 @@ class VoiceRecognizer(nn.Module):
             loss2 = torch.cat(loss2)
             predict = self.forward(wave, 'train')[-1].argmax()
             if predict == similarity1.argmax() == similarity2.argmax():
-                print('Owner')
+                # print('Owner')
+                return True
             else:
-                print('Unknown')
+                # print('Unknown')
+                return False
+            
             predict, similarity1.argmax(), similarity2.argmax()
-
 
     # 모델 훈련
     def train_model(self, data, lr=0.001, epochs=15, mode='train'):
