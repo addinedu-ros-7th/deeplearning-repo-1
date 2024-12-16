@@ -1,32 +1,27 @@
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import *
 from PyQt5 import uic
 from Modules import *
 
 import os 
-import time
 import cv2
 import sys
+import time
+import asyncio
 from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from AI_Center import *
 
-data_path = "../../../test/data/face/"
-
-path="/CASS_brain/GUI/"
-ui_file = os.path.join(path, "CASS_ui.ui")
 ui_file = "CASS_ui.ui"
-register_file = os.path.join(path, "Register.ui")
 register_file = "Register.ui"
 
 form_class = uic.loadUiType(ui_file)[0]
 form_register_class = uic.loadUiType(register_file)[0]
 
-# ESP32_IP = "172.20.10.8"
-# ESP32_PORT = 8080
-# client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+ESP32_IP = "192.168.0.28"
+ESP32_PORT = 8080
 
 index = False
 
@@ -50,34 +45,91 @@ class MainWindow(QMainWindow, form_class):
         self.TCP = TCP()
 
         self.ath_model = FaceRecognitionModel() # face athentification model
-        self.setUserImage()
+        self.setDriverImage()
         self.drowsy_model = DrowseDetection('bestFace.pth')
         self.detect_model = ObjectDetection('bestDetect.pt')
         self.segment_model = LaneSegmentation('bestSeg.pt')
         self.emergency_model = EmergencyRecognizer().cuda()
         self.emergency_model.load_state_dict(torch.load('emergency.pt'))
         self.emergency_model.RTparameter_setting()
-
+    
         self.setLabelCams()
         self.cameraOn()
 
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.process_events)
+        self.timer.start(100)
+
+        self.reader = None
+        self.writer = None
+
+        # self.reader, self.writer = asyncio(self.connect_async())
+        asyncio.ensure_future(self.connect_async())
+
+        self.threshold = 40
+        self.threshold_2 = 5
+        self.gear = "R1"
         self.lineEdit.returnPressed.connect(self.changeThreshold)
+        self.lineEdit_3.returnPressed.connect(self.changeThreshold_2)
+        self.lineEdit_2.returnPressed.connect(self.changeGear)
 
     def changeThreshold(self):
         self.threshold = self.lineEdit.text()
         print(self.threshold)
 
-    # def setPlots(self):
-    #     self.plotDiff = self.findChild(pg.PlotWidget, 'plotDiff')
-    #     self.plotPerson = self.findChild(pg.PlotWidget, 'plotPerson')
+    def changeThreshold_2(self):
+        self.threshold_2 = self.lineEdit_3.text()
+        print(self.threshold_2)
 
-    #     self.plotDiff.setBackground(background=None)
-    #     self.plotPerson.setBackground('w')
+    def changeGear(self):
+        self.gear = self.lineEdit_2.text()
+        print(self.gear)
+        self.sendMsg(self.gear)
 
-        # self.plotPerson.showGrid(x=True, y=True)
+    def process_events(self):
+        loop = asyncio.get_event_loop()
+        loop.call_soon(loop.stop)
+        loop.run_forever()
 
-    # def updatePlots(self):
-    #     self.data_line = self.plotDiff.plot(self.pen='y')
+    async def connect_async(self):
+        try:
+            self.reader, self.writer = await asyncio.open_connection(ESP32_IP, ESP32_PORT)
+            print("Connected to ESP32")
+            self.sendMsg("11")
+        except Exception as e:
+            print(f"An error occurred when connecting: {e}")
+
+    async def async_send_message(self, message):
+        try:
+            self.writer.write(message.encode())
+            await self.writer.drain()
+
+            data = await self.reader.read(100)
+            print(f'Received: {data.decode()}')
+
+            if data:
+                self.labelReceive.setText(data.decode())
+            
+            if data == message:
+                self.stopFlag = True
+                print("data received")
+            else:
+                self.stopFlag = False
+                print("data not received")
+
+        except Exception as e:
+            pass
+
+    def sendMsg(self, message):
+        if self.writer:
+            asyncio.ensure_future(self.async_send_message(message))
+        else:
+            print("No writer available")
+
+    async def close_connection(self):
+        self.writer.close()
+        await self.writer.wait_closed()
+        print("Connection closed")
 
     def setIcons(self):
         self.btnForward.setIcon(QIcon("./icons/arrowUp.png"))
@@ -121,15 +173,10 @@ class MainWindow(QMainWindow, form_class):
 
     def setStates(self):
         self.duration = 0
-        self.maxDiff = 200
         self.count = 0
-        self.threshold = 60
         self.authentified = False
         self.stopFlag = False
         self.isDrive = False
-        self.isPersonAppear = False
-        self.isRedLight = False
-        self.isGreenLight = False
         self.isRecording = False
 
         self.isDrowsy1 = False
@@ -137,10 +184,10 @@ class MainWindow(QMainWindow, form_class):
 
         self.input_data = {'objects':[], 'direction':None, 'select_road':None}
         self.UI_objs = {'person':'dynamic', 
-                'obstacle':'static', 
-                'goat':'dynamic',
-                'red_light':'red',
-                'green_light':'green'}
+                        'obstacle':'static', 
+                        'goat':'dynamic',
+                        'red_light':'red',
+                        'green_light':'green'}
         self.objs_keys = self.UI_objs.keys()
 
         # Lane Segmentation Parameter
@@ -148,12 +195,10 @@ class MainWindow(QMainWindow, form_class):
         self.et = time.time()
         self.dt = 0
         self.avoid_check = False
-        self.checkitout = True
         self.road_select = 'center'
         self.direction = "straight"
         self.road = "center"
         self.order = None
-        self.prev_order = None
         self.curFlag = None
 
     def push_info(self, cls_list, direction, select_road):
@@ -202,30 +247,30 @@ class MainWindow(QMainWindow, form_class):
 
         if 'left' == select_road:
             self.labelSelectRoadLeft.show()
+            print(select_road)
         else:
             self.labelSelectRoadLeft.hide()
         if 'right' == select_road:
             self.labelSelectRoadRight.show()
+            print("select_road : ", select_road)
         else:
             self.labelSelectRoadRight.hide()
 
     def setBtns(self):
         self.labelRec.hide()
+        self.btnRegister.hide()
 
         self.btnRec.clicked.connect(self.clickRecord)
-        self.btnRegister.clicked.connect(self.register)
 
+        self.btnPower.clicked.connect(self.driveState)
         self.btnForward.clicked.connect(lambda: self.setDirection("straight"))
         self.btnRight.clicked.connect(lambda: self.setDirection("right"))
         self.btnLeft.clicked.connect(lambda: self.setDirection("left"))
         self.btnStop.clicked.connect(lambda: self.setDirection("stop"))
 
-        # if self.isDrive == False:
-        self.btnPower.clicked.connect(self.driveState)
-        # else:
-            # self.btnRight.clicked.connect(lambda: self.road("right")) # 추월용 비키삼~!
-            # self.btnLeft.clicked.connect(lambda: self.road("left"))
-            # self.btnBackward.clicked.connect(lambda: self.road("back"))
+        # self.btnRight.clicked.connect(lambda: self.road("right")) # 추월용 비키삼~!
+        # self.btnLeft.clicked.connect(lambda: self.road("left"))
+        # self.btnBackward.clicked.connect(lambda: self.road("back"))
 
         #for testing
         self.btnCamOn.clicked.connect(self.legCamOn)
@@ -233,28 +278,91 @@ class MainWindow(QMainWindow, form_class):
         self.btnTest.clicked.connect(self.test)
 
     def keyPressEvent(self, event):
+        """
+        control with keyboard
+
+        when auto driving mode (engine_state = ON)
+        W : straight 
+        A : left _ steering direction
+        D : right - steering direction
+        S : stop - engine_state = OFF
+
+        when manual driving mode (engine_state = OFF)
+        W : drive 
+        A : left 
+        D : right
+        S : reverse
+
+        O : change engine state 
+        R : record
+        C : connect to esp32 
+        E : emergency stop
+        """
+
         if event.key() == Qt.Key_W:
+            # if self.isDrive == False:
+            #     self.sendMsg("drive")
+            #     print("send drive")
+            # else:
+            #     self.setDirection("straight")
+            #     print("direction straight")
+
             self.setDirection("straight")
+
         elif event.key() == Qt.Key_A:
+            # if self.isDrive == False:
+            #     self.sendMsg("L2")
+            # else:
+            #     self.setDirection("left")
+
             self.setDirection("left")
+
         elif event.key() == Qt.Key_D:
+            # if self.isDrive == False:
+            #     self.sendMsg("R2")
+            # else:
+            #     self.setDirection("right")
+
             self.setDirection("right")
+
         elif event.key() == Qt.Key_S:
-            self.setDirection("reverse")
+            if self.isDrive == True:
+                self.isDrive = False
+            else:
+                self.sendMsg("reverse")
+                self.isDrive = False
+                print("send reverse")
+
         elif event.key() == Qt.Key_O:
             self.driveState()
+            
         elif event.key() == Qt.Key_R:
             self.clickRecord()
+
+        # for testing
         elif event.key() == Qt.Key_T:
             self.test()
+        elif event.key() == Qt.Key_C:
+            self.connectLeg()
+        elif event.key() == Qt.Key_V:
+            self.legCamOn()
+        elif event.key() == Qt.Key_E:
+            self.selectRoad("side_park")
 
     def setDirection(self, direction):
         self.direction = direction
+
+    def selectRoad(self, road):
+        self.road = road
 
     def driveState(self):
         if self.isDrive == False:
             self.isDrive = True
             self.btnPower.setText("Stop")
+            self.sendMsg("accel")
+            self.sendMsg("accel")
+            self.sendMsg("accel")
+            print("try to send accel")
         else:
             self.isDrive = False
             self.btnPower.setText("Drive")
@@ -263,6 +371,7 @@ class MainWindow(QMainWindow, form_class):
         # print("test env")
         self.btnTest.hide()
         self.btnConnect.hide()
+        self.btnRegister.hide()
         self.legCamOn()
         self.btnCamOn.hide()
         self.authentified = True
@@ -280,8 +389,8 @@ class MainWindow(QMainWindow, form_class):
     def updateRecording(self):
         if self.isRecording == True:
             self.count += 1
-            # frame = cv2.cvtColor(self.leg_frame, cv2.COLOR_BGR2RGB)
-            # self.writer.write(frame)
+            frame = cv2.cvtColor(self.leg_frame, cv2.COLOR_BGR2RGB)
+            self.writer.write(frame)
 
             if self.count % 8 == 0:
                 self.labelRec.hide()
@@ -314,24 +423,39 @@ class MainWindow(QMainWindow, form_class):
             self.writer.release()
             self.labelRec.hide()
 
+    def setDriverImage(self):
+        path_dir = "../../../test/data/face/register"
+        file_name = os.listdir(path_dir)
+        path_name = file_name[0][:-4]
+        '''
+        TODO:need to create user image
+        '''
+        self.path = "../../../test/data/face/my_img/soyoung.png"
+        self.name = "soyoung"
+
+        self.ath_model.set_user_image(self.path)
+        self.ath_model.set_known_user(self.ath_model.my_face_encoding, self.name)
+
     def connectLeg(self):
+        asyncio.ensure_future(self.connect_async())
         self.btnConnect.hide()
 
     def setCamThreads(self):
         self.faceCam = Thread() #
         self.faceCam.daemon = True #
         self.faceCam.update.connect(self.updateFaceCam) #
+        # self.faceCam.update.connect(self.emergencyDetection)
 
         self.legCam = Thread()
         self.legCam.daemon = True
         self.legCam.update.connect(self.updateLegCam2)
-        # self.legCam.update.connect(self.updatePlots)
 
         self.record = Thread()
         self.record.daemon = True
         self.record.update.connect(self.updateRecording)
     
     def setLabelCams(self):
+        
         self.width, self.height = self.labelFaceCam.width(), self.labelFaceCam.height()
         self.facePixmap = QPixmap(self.width, self.height)
 
@@ -360,6 +484,8 @@ class MainWindow(QMainWindow, form_class):
         '''
         in case not using face_recognition
         '''
+        self.sendMsg("21") # "soyoung" ^.^
+
         self.labelFaceCam.hide()
         self.legCam.start()
         self.legCam.isRunning = True
@@ -367,66 +493,12 @@ class MainWindow(QMainWindow, form_class):
 
         self.authentified = True
 
-    def setUserImage(self):
-        path_dir = "../../../test/data/face/register"
-        file_name = os.listdir(path_dir)
-        path_name = file_name[0][:-4]
-        '''
-        TODO:need to create user image
-        '''
-        self.path = "../../../test/data/face/my_img/soyoung.png"
-        self.name = "soyoung"
-
-        self.ath_model.set_user_image(self.path)
-        self.ath_model.set_known_user(self.ath_model.my_face_encoding, self.name)
-
-    def register(self):
-        self.registerWindow = QDialog(self)
-        uic.loadUi("Register.ui", self.registerWindow)
-        self.registerWindow.btnUserRegister.clicked.connect(self.userRegister)
-        self.registerWindow.btnReturn.clicked.connect(self.returnMain)
-        self.registerWindow.editContactNumber.textChanged.connect(self.legExCheck)
-        self.registerWindow.show()
-        self.db.connectLocal()
-
-    def userRegister(self):
-        name = self.registerWindow.editName.text()
-        birth = self.registerWindow.dateEditBirth.date().toPyDate()
-        contact_number = self.registerWindow.editContactNumber.text()
-
-        if name == "" or birth == "" or contact_number == "":
-            QMessageBox.warning(self, "warning", "빈칸을 채워주세요")
-            return
-        
+    def emergencyDetection(self):
+        road_state = self.emergency_model.RTstreaming()
+        if road_state == "Emergency":
+            self.selectRoad("side_park")
         else:
-            self.driver.getInfo(name, birth, contact_number)
-            self.registerWindow.hide()
-            self.driver_id = self.db.registerUser(name, birth, contact_number)
-            QMessageBox.warning(self, "Photo", "정면을 보세요~ 2초 뒤 사진이 촬영됩니다.")
-            
-            if self.duration == 2:
-                self.createUserImage(self.driver_id, name)
-                self.start = time.time()
-
-    def createUserImage(self, driver_id, name):
-        dir = "../../../test/data/face/register/"
-        self.path = str(driver_id) + name
-        cv2.imwrite(dir + self.path + ".png", cv2.cvtColor(self.face_frame, cv2.COLOR_BGR2RGB))
-        self.db.registerPhoto(driver_id, self.path)
-        self.db.local.close()
-
-    def legExCheck(self):
-        tmp = self.registerWindow.editContactNumber.text()
-        if len(tmp) == 3 and self.len_prev == 2:
-            self.registerWindow.editContactNumber.setText(tmp + "-")
-        elif len(tmp) == 8 and self.len_prev == 7:
-            self.registerWindow.editContactNumber.setText(tmp + "-")
-        elif len(tmp) == 8 and self.len_prev == 9:
-            self.registerWindow.editContactNumber.setText(tmp + "-")
-        self.len_prev = len(tmp)
-
-    def returnMain(self):
-        self.registerWindow.hide()
+            pass
         
     def authentification(self, frame):
         '''
@@ -446,9 +518,10 @@ class MainWindow(QMainWindow, form_class):
                     self.authentified = True
                     QMessageBox.warning(self, "Authentification ", 
                     f"{self.name} Driver Authentification Success.")
+                    self.sendMsg(self.name)
                     self.cameraOn()
 
-    def DrowsyDetection(self, frame):
+    def drowsyDetection(self, frame):
         """
         if driver is drowsy, turn a camera on 
         if driver is drowsy for (5 secs), control CASS_leg for wake up driver
@@ -459,22 +532,23 @@ class MainWindow(QMainWindow, form_class):
             if predict == 0:
                 if self.duration > 4:
                     self.isDrowsy1 = True
-                    if self.isRecording == False:
-                        print("record on")
-                        self.clickRecord()
-                        """
-                        TODO: log to DB
-                        """
+                    # if self.isRecording == False:
+                        # print("record on")
+                        # self.clickRecord()
+                        # """
+                        # TODO: log to DB
+                        # """
                     if self.duration > 7:
                         if self.Drowsy1 != self.Drowsy2:
                             self.labelLegCam.setStyleSheet("border: 5px solid red")
                             self.print("emergency")
+                            self.selectRoad("side_park")
             else:
                 self.start = time.time()
                 self.labelLegCam.setStyleSheet("")
                 self.isDrowsy1 = False
-                if self.isRecording == True:
-                    self.clickRecord()
+                # if self.isRecording == True:
+                #     self.clickRecord()
         except:
             self.start = time.time()
             self.isDrowsy1 = False
@@ -493,91 +567,22 @@ class MainWindow(QMainWindow, form_class):
             self.end = time.time()
             self.duration = self.end - self.start
 
-            if self.authentified == False:
-                self.authentification(frame)
+            # if self.authentified == False:
+            #     self.authentification(frame)
             
-            else:
-                self.DrowsyDetection(frame)
-            
-            # if self.isDrowsy1 != self.isDrowsy2:
-            #     print("drowsy changed emergency")
+            # else:
+            #     self.drowsyDetection(frame)
 
-            """
-            side_park
-            """
-                
             h, w, c = frame.shape
             qImg = QImage(frame, w, h, w*c, QImage.Format_RGB888)
             self.facePixmap = self.facePixmap.fromImage(qImg)
             self.facePixmap = self.facePixmap.scaled(self.width, self.height)
             self.labelFaceCam.setPixmap(self.facePixmap)
 
-    def updateLegCam(self):
-        ret, self.frame = self.legVideo.read()
-        
-        if ret:
-            frame = self.frame.copy()
-            h, w, c = frame.shape
-            diff_x = self.segment_model(frame)
-            detect_list = self.detect_model.get_distance(frame)
-
-            if self.isPersonAppear == False:
-                if "person"  in detect_list:
-                    # response = self.TCP.sendMsg("stop")
-                    self.isPersonAppear = True
-
-            else:
-                if "person" not in detect_list:
-                    # response = self.TCP.sendMsg("drive")
-                    self.isPersonAppear = False
-
-            if self.isRedLight == False:
-                if "red_light" in detect_list:
-                    # response = self.TCP.sendMsg("stop")
-                    self.isRedLight = True
-                    self.isGreenLight = False
-
-            else:
-                if "red_light" not in detect_list:
-                    self.isRedLight = False
-                    self.isGreenLight = True
-
-            if self.isGreenLight == False:
-                if "green_light" in detect_list:
-                    # response = self.TCP.sendMsg("drive")
-                    self.isGreenLight = True
-                    self.isRedLight = False
-
-            # if diff_x:
-                # print("diff_x : ", diff_x)
-
-                # if self.isPersonAppear == False:
-                #     if diff_x == 0:
-                #         # response = self.TCP.sendMsg("drive")
-                #     elif diff_x > 50:
-                #         # response = self.TCP.sendMsg("R1")
-                #         if diff_x > 180:
-                #             # response = self.TCP.sendMsg("R2")
-                #     elif diff_x < 50:
-                #         # response = self.TCP.sendMsg("L1")
-                #         if diff_x < -180:
-                #             # response = self.TCP.sendMsg("L2")
-
-                # data_line = self.plotDiff.plot(diff_x, pen='k', width=2)
-                # print(data_line)
-                # data_line.setData(diff_x)
-                        
-            cvt_color_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            qImg = QImage(cvt_color_frame, w, h, w*c, QImage.Format_RGB888)
-            self.legPixmap = self.legPixmap.fromImage(qImg)
-            self.legPixmap = self.legPixmap.scaled(self.w, self.h)
-            self.labelLegCam.setPixmap(self.legPixmap)
-
     def updateLegCam2(self):
         ret, self.frame = self.legVideo.read()
         
         if ret:
-            # frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
             frame = self.frame.copy()
             h, w, c = frame.shape
             try:
@@ -590,7 +595,7 @@ class MainWindow(QMainWindow, form_class):
             try:
                 '''
                     # direction : straight, left, right
-                    # select_road : center, left, right
+                    # select_road : center, left, right, side_park
                 '''
                 self.road_segment = self.segment_model(frame, self.direction, self.road, obstacle)
                 
@@ -620,45 +625,58 @@ class MainWindow(QMainWindow, form_class):
                         self.check = True
             except:
                 pass
+
             response = 'drive'
+
             if self.isDrive == True:
                 if order == 'drive':
                     try:
-
                         if slope:
+                            # print(slope)
                             th = self.threshold
-                            th_r = th/2
-                            th_l = - (th/2)
+                            th_2 = self.threshold_2
+                            th_r = th
+                            th_l = - th
 
                             if slope > th_l and slope < th_r :
                                 response = "drive"
+                                # print("drive")
                             elif slope > th_r:
                                 response = "R1"
-                                if slope > th_r + th:
-                                    response = "R2"
+                                if slope > th_r + 20:
+                                    response = "R3"
+                                    # print(slope, response)
 
                             elif slope < th_l:
                                 response = "L1"
-                                if slope < th_l - th:
-                                    response = "L2"
+                                if slope < th_l - -20:
+                                    response = "L3"
+                                # elif slope < th_l - th_2 - th_2:
+                                #     response = "L3"
 
                         else:
                             response = "drive"
                     except:
-                        # print("no driveway")
-                        response = "no driveway"
+                        # response = "no driveway"
+                        response = response
                 else:
                     response = "stop"
             else:
                 response = "stop"
 
-
-            if response != self.curFlag and response != "no driveway":
-                self.curFlag = response
-                # self.TCP.sendMsg(response)
+            # if self.stopFlag == False:
+            message = self.TCP.encodeMsg(response)
+            self.sendMsg(message)
             
+            # print(message)
             self.labelState.setText(response)
-            self.labelDirection.setText(self.direction)
+
+            # if response != self.curFlag and response != "no driveway":
+            #     self.curFlag = response
+            #     message = self.TCP.encodeMsg(response)
+            #     self.async_send_message(message)
+            #     print(message)
+            
             self.push_info(self.cls_list, self.direction, self.road_select)
 
             self.leg_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -666,12 +684,14 @@ class MainWindow(QMainWindow, form_class):
             self.legPixmap = self.legPixmap.fromImage(qImg)
             self.legPixmap = self.legPixmap.scaled(self.w, self.h)
             self.labelLegCam.setPixmap(self.legPixmap)
-
     
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(asyncio.ensure_future(asyncio.sleep(0)))
 
     sys.exit(app.exec_())
     # client_socket.close()
