@@ -74,8 +74,9 @@ class CASS_BOT(nn.Module):
                     result = data.get('sttResult', {}).get('transcript', '')
                     if result:
                         result = re.sub(r'카스|갔을|갔어|가스', 'CASS', result)
+                        result = result.replace('시동 거', '시동 꺼')
                         print('=' * 50)
-                        print(f"STT Result: {result}")
+                        #print(f"STT Result: {result}")
                         return result
             except InvalidStatusCodeError:
                 pass
@@ -208,16 +209,15 @@ if __name__ == "__main__":
                 print('CASS_bot activated!')
                 print('user_input : ', cass_bot.user_input)
                 response = cass_bot.cass_result(cass_bot.user_input)
-                
-                order = cass_bot.check_result(response)
-                if order != None:
-                    print('order ------------------->', order)
 
                 if '현재 시간은' in response:
                     response = cass_bot.calc_time()
 
                 # 모델 응답 출력
                 print("CASS 응답:", response)
+                order = cass_bot.check_result(response)
+                if order != None:
+                    print('order ------------------->', order)
                 print('=' * 50)
 
                 cass_bot.text_to_speech(response)
