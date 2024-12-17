@@ -106,7 +106,7 @@ class EmergencyRecognizer(nn.Module):
         self.check = None
         self.frame_buffer = np.zeros((self.chunk*buffer_size))  # 1024 샘플을 버퍼에 저장 (모노 채널 가정)
 
-    def RTsteaming(self, mode='qt'):
+    def RTstreaming(self, mode='qt'):
         if mode=='qt':
             # 오디오 청크 읽기
             audio_data = self.stream.read(self.chunk)

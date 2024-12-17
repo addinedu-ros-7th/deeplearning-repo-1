@@ -50,8 +50,6 @@ class TCP():
                 self.message = "33\n"
             case "accel":
                 self.message = "34\n"
-                print("accel sent")
-        
             case "L1":
                 self.message = "41\n"
             case "L2":
