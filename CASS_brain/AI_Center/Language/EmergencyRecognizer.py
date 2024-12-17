@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 import pyaudio
 import numpy as np
-
+from tqdm import tqdm
 # 모델 정의 (간단한 CNN 모델)
 class EmergencyRecognizer(nn.Module):
     def __init__(self, input_size=120, n_classes=2):
@@ -15,20 +15,23 @@ class EmergencyRecognizer(nn.Module):
         self.conv1 = nn.Sequential(
             nn.Conv1d(input_size, 512, kernel_size=3, stride=1),
             nn.MaxPool1d(kernel_size=2, stride=2),
+            nn.ReLU()
         )
         self.conv2 = nn.Sequential(
             nn.Conv1d(512, 512, kernel_size=3, stride=1),
-            nn.MaxPool1d(kernel_size=2, stride=2),
+            nn.ReLU()
         )
         self.conv3 = nn.Sequential(
             nn.Conv1d(512, 512, kernel_size=3, stride=1),
         )
-        self.fc = nn.Linear(512, n_classes)
+        self.fc = nn.Sequential(
+            nn.Linear(512, n_classes),
+        )
     
     def forward(self, x):
-        x = torch.relu(self.conv1(x))  # 첫 번째 convolution 레이어
-        x = torch.relu(self.conv2(x))  # 두 번째 convolution 레이어
-        x = torch.relu(self.conv3(x))  # 두 번째 convolution 레이어
+        x = self.conv1(x)  # 첫 번째 convolution 레이어
+        x = self.conv2(x)  # 두 번째 convolution 레이어
+        x = self.conv3(x)  # 두 번째 convolution 레이어
         x = x.mean(dim=2)  # Time axis 평균, 즉 각 채널의 평균값으로 차원 축소
         x = self.fc(x)  # Fully connected layer
         return x
@@ -44,7 +47,9 @@ class EmergencyRecognizer(nn.Module):
     def train_model(self, filepaths, lr=0.001, epochs=15):
         optimizer = optim.Adam(self.parameters(), lr=lr)
         criterion = nn.CrossEntropyLoss()
-        for epoch in range(epochs):
+        pbar = tqdm(range(epochs))
+        best = 100
+        for epoch in pbar:
             self.train()
             total_loss = 0
             for filepath in filepaths:
@@ -60,7 +65,10 @@ class EmergencyRecognizer(nn.Module):
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item()
-            print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss/len(filepaths):.4f}")
+            if total_loss/len(filepaths) < best:
+                best = total_loss/len(filepaths)
+                torch.save(self.state_dict(), 'best_model.pt')
+            pbar.set_description(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss/len(filepaths):.4f}")
 
     def z_score_normalize(self, waveform):
         # waveform의 평균과 표준편차 계산
