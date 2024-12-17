@@ -12,12 +12,12 @@
 |구분|상세|
 |------|----------------------|
 |개발환경|<img src="https://img.shields.io/badge/Ubuntu-E95420?style=flat-square&logo=Ubuntu&logoColor=white" style="width: 67px; height: 20px;"> <img src="https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=Python&logoColor=white">|
-|딥러닝 및 영상처리| <img src="https://github.com/user-attachments/assets/5f8d52f1-1b12-4075-a59d-a641c01ad558" style="width: 67px; height: 20px;"> <img src="https://img.shields.io/badge/Ultralytics-1976D2?style=flat&logo=Ultralytics&logoColor=white" /> <img src="https://img.shields.io/badge/Ultralytics-1976D2?style=flat&logo=Ultralytics&logoColor=white" />|
-|데이터베이스|<img src="https://img.shields.io/badge/Ultralytics-1976D2?style=flat&logo=Ultralytics&logoColor=white" />|
-|GUI|<img src="https://img.shields.io/badge/Ultralytics-1976D2?style=flat&logo=Ultralytics&logoColor=white" />|
-|통신|<img src="https://img.shields.io/badge/Ultralytics-1976D2?style=flat&logo=Ultralytics&logoColor=white" />|
-|하드웨어|<img src="https://img.shields.io/badge/Ultralytics-1976D2?style=flat&logo=Ultralytics&logoColor=white" />|
-|형상관리 및 협업|<img src="https://img.shields.io/badge/GitHub-1976D2?style=flat-square&logo=GitHub&logoColor=white"/> <img src="https://img.shields.io/badge/Ultralytics-1976D2?style=flat&logo=Ultralytics&logoColor=white" /> <img src="https://img.shields.io/badge/Ultralytics-1976D2?style=flat&logo=Ultralytics&logoColor=white" />|
+|딥러닝 및 영상처리| <img src="https://github.com/user-attachments/assets/5f8d52f1-1b12-4075-a59d-a641c01ad558" style="width: 67px; height: 20px;"> <img src="https://img.shields.io/badge/OpenCV-5C3EE8?style=flat&logo=OpenCV&logoColor=white" /> <img src="https://img.shields.io/badge/PyTorch-EE4C2C?style=flat-square&logo=PyTorch&logoColor=white" style="width: 67px; height: 20px;">
+|데이터베이스|<img src="https://img.shields.io/badge/MySQL-4479A1?style=flat&logo=MySQL&logoColor=white">|
+|GUI| <img src="https://img.shields.io/badge/PyQt5-41CD52?style=for-the-badge&logo=Qt&logoColor=white" style="width: 67px; height: 20px;">
+|통신|<img src="https://img.shields.io/badge/SocKet-C93CD7?style=flat&logo=SocKet&logoColor=white" />|
+|하드웨어|<img src="https://img.shields.io/badge/ARDUINO UNO-00878F?style=for-the-badge&logo=Arduino&logoColor=white" style="width: 97px; height: 20px;">
+|형상관리 및 협업|<img src="https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=GitHub&logoColor=white"/> <img src="https://img.shields.io/badge/Slack-4A154B?style=for-the-badge&logo=Slack&logoColor=white" style="width: 67px; height: 20px;"/> <img src="https://img.shields.io/badge/Confluence-172B4D?style=flat&logo=Confluence&logoColor=white" style="width: 87px; height: 20px;">|
 
 ### 1.2. 프로젝트 목표
 - <b>차선 인식을 통한 주행 경로 유지 제어(Segmentation)</b><br/>
