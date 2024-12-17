@@ -23,13 +23,11 @@ struct Delta{
 };
 
 Delta d = {0, 0};
+Delta brake = {0, 0};
 
-bool acc_ON; // 가속 보정
-int acc_cnt = 0; // 가속 보정용 count 변수
-// static int steering_cnt = 0; // 선회 주행용 변수
 bool steer_ON = false;
-bool LorR;
-bool prev_steer_status = false;
+bool Siren = false;
+bool prev_siren = true;
 
 // LED, 부저 millis() 세팅
 unsigned long LED_start_time = 0;
@@ -53,7 +51,7 @@ bool BackFlag = false;
 // 속도 출력용 변수
 int show_speed = 0;
 
-WiFiServer server(8080);
+WiFiServer server(500);
 
 
 void LED_startTimer()
@@ -76,91 +74,42 @@ bool LED_checkTimer()
   return false;
 }
 
-// void ACCEL()
-// {
-//   if (acc_cnt >= 20)
-//   {
-//     steering_mode = 1;
-//     left_speed = basic_left_speed;
-//     right_speed = basic_right_speed;
-//     acc_ON = false;
-//     acc_cnt = 0;
-//   }
-//   else
-//   {
-//     left_speed = basic_left_speed + 40;
-//     right_speed = basic_right_speed + 40;
-//   }
-// }
-
-// void STEER_SPEED_DESCEND()
-// {
-//   for(int i = 0 ; i < 30; i++)
-//   {
-//     Serial.println(i);
-//   }
-// }
-
-void SidePark(int time)
-{
-  for (time; time > 0 ; time --)
-  {
-    d.l_delta = d.l_delta - 0.1;
-    d.r_delta = d.r_delta - 0.1;
-    GO_FORWARD();
-    delay(10);
-    if (curr_left_speed < 90 || curr_right_speed < 90)
-    {
-      d.l_delta = 0;
-      d.r_delta = 0;
-      curr_left_speed = 0;
-      curr_right_speed = 0;
-      StopFlag = true;
-      return;
-    }
-  }
-}
 
 void GO_FORWARD()
 {
-  analogWrite(motor_L_forward, basic_left_speed+d.l_delta);
+  curr_left_speed = basic_left_speed + d.l_delta-brake.l_delta;
+  curr_right_speed = basic_right_speed + d.r_delta-brake.r_delta;
+
+  analogWrite(motor_L_forward, curr_left_speed);
   analogWrite(motor_L_reverse, 0);
 
-  analogWrite(motor_R_forward, basic_right_speed+d.r_delta);
+  analogWrite(motor_R_forward, curr_right_speed);
   analogWrite(motor_R_reverse, 0);
-
-  curr_left_speed = basic_left_speed + d.l_delta;
-  curr_right_speed = basic_right_speed + d.r_delta;
-
-  Serial.print("curr_left_speed: ");
-  Serial.println(curr_left_speed);
-  Serial.print("curr_right_speed: ");
-  Serial.println(curr_right_speed);
 
 }
 
 void GO_BACK()
 {
+  curr_left_speed = basic_left_speed + d.l_delta-brake.l_delta;
+  curr_right_speed = basic_right_speed + d.r_delta-brake.r_delta;
+  
   analogWrite(motor_R_forward, 0);
-  analogWrite(motor_R_reverse, basic_right_speed+d.r_delta);
+  analogWrite(motor_R_reverse, curr_right_speed);
 
   analogWrite(motor_L_forward, 0);
-  analogWrite(motor_L_reverse, basic_left_speed+d.l_delta);
-  
-  curr_left_speed = basic_left_speed + d.l_delta;
-  curr_right_speed = basic_right_speed + d.r_delta;
+  analogWrite(motor_L_reverse, curr_left_speed);
 }
 
 void STOP()
 {
-  analogWrite(motor_R_forward, basic_right_speed+d.r_delta);
-  analogWrite(motor_R_reverse, basic_right_speed+d.r_delta);
-
-  analogWrite(motor_L_forward, basic_left_speed+d.l_delta);
-  analogWrite(motor_L_reverse, basic_left_speed+d.l_delta);
-
   curr_left_speed = basic_left_speed + d.l_delta;
   curr_right_speed = basic_right_speed + d.r_delta;
+
+  analogWrite(motor_R_forward, curr_right_speed);
+  analogWrite(motor_R_reverse, curr_right_speed);
+
+  analogWrite(motor_L_forward, curr_left_speed);
+  analogWrite(motor_L_reverse, curr_left_speed);
 }
 
 void Emergency()
@@ -265,10 +214,6 @@ void loop() {
 
       case 31: // 직진
         // client.print("drive\n");
-        if (StopFlag)
-        {
-          acc_ON = true;
-        }
           BackFlag = false;
           StopFlag = false;
           steering_mode = 1;
@@ -283,10 +228,6 @@ void loop() {
 
       case 33: // 후진
         // client.println("reverse\n");
-        if (StopFlag)
-        {
-          acc_ON = true;
-        }
         BackFlag = true;
         steering_mode = 1;
         StopFlag = false;
@@ -337,7 +278,7 @@ void loop() {
 
       case 88: // 갓길 주차
         // client.print("Side park\n");
-        SidePark(500);
+        Siren = true;
         break;
 
       case 99: // 비상 제동
@@ -348,7 +289,6 @@ void loop() {
     }
 
     switch (steering_mode) {
-
       case 0: // 정지
         d = {-basic_left_speed, -basic_right_speed};
 
@@ -365,9 +305,7 @@ void loop() {
         break;
 
       case 4: // L3
-        LorR = true; // 좌회전
         d = {-50, 155};
-        steer_ON = true;
         break;
       
       case 5: // R1
@@ -379,67 +317,74 @@ void loop() {
         break;
 
       case 7: // R3
-        LorR = false; //우회전
         d = {115, -20};
-        steer_ON = true;
         break;
 
       case 8: // ACCEL
         d = {40, 40};
         break;
-    
     }
-    
-    // if (acc_ON)
-    // {
-    //   ACCEL();
-    //   acc_cnt++;
-    //   Serial.print("acc_cnt: ");
-    //   Serial.println(acc_cnt);
-    // }
 
-    // if (steer_ON)
-    // {
-    //   Serial.println("steer_ON 진입");
-    //   if (prev_steer_status)
-    //   {
-    //     prev_steer_status = false;
-    //     STEER_SPEED_DESCEND();
-    //   }
-    //   else
-    //   {
-    //     steering_cnt --;
-    //   }
-    //   if (LorR)
-    //   {
-    //     if ()
-    //     steering_mode = 1;
-    //     steering_cnt == 80;
-    //     steer_ON = false;
-    //   }
-    // }
-
-    if (StopFlag)
+    if(Siren && prev_siren)
     {
-      d = {-basic_left_speed, -basic_right_speed};
-      STOP();
-      digitalWrite(RED1, HIGH);
-      digitalWrite(RED2, HIGH);
-    }
+      Serial.println("siren 반복문 재진입");
+      if (steering_mode > 0)
+      {
+        brake.l_delta+=1;
+        brake.r_delta+=1;
+        delay(15);
+        if (StopFlag)
+        {
+          STOP();
+        }
+        else
+        {
+          if(BackFlag)
+          {
+            GO_BACK();
+          }
+          else
+          {
+            GO_FORWARD();
+          }
+        }
+      }
+      if (curr_right_speed <= 0 || curr_left_speed <= 0)
+      {
+        d = {-basic_left_speed, -basic_right_speed};
+        brake = {0, 0};
+        StopFlag = true;
+        Siren = false;
+        prev_siren = false;
+        STOP();
+      }
+
+    } 
     else
     {
-      digitalWrite(RED1, LOW);
-      digitalWrite(RED2, LOW);
-      if (BackFlag)
+      prev_siren = true;
+      if (StopFlag)
       {
-        GO_BACK();
+        STOP();
+        digitalWrite(RED1, HIGH);
+        digitalWrite(RED2, HIGH);
       }
       else
       {
-        GO_FORWARD();
-      }
-      
+        digitalWrite(RED1, LOW);
+        digitalWrite(RED2, LOW);
+        if (BackFlag)
+        {
+          GO_BACK();
+        }
+        else
+        {
+          GO_FORWARD();
+        }
+        
+      } 
     }
+    
 
     //LED 작동함수
     if (BLUE_ON && LED_checkTimer())
@@ -463,18 +408,5 @@ void loop() {
       Emergency_Signal = false;
       continue;
     }
-
-    // if (show_speed == 10)
-    // {
-    // Serial.println("-----------------------------");
-    // Serial.print("좌측륜 속도: ");
-    // Serial.print(left_speed);
-    // Serial.print(", ");
-    // Serial.print("우측륜 속도: ");
-    // Serial.println(right_speed);
-    // Serial.println("-----------------------------");
-    // show_speed = 0;
-    // }
-
   }
 }
