@@ -9700,6 +9700,9 @@ border-radius:20px;</string>
     <property name="text">
      <string>TextLabel</string>
     </property>
+    <property name="alignment">
+     <set>Qt::AlignCenter</set>
+    </property>
    </widget>
    <zorder>labelLegCam</zorder>
    <zorder>btnLeft</zorder>

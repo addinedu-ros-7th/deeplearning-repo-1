@@ -25,8 +25,6 @@ import re
 from datetime import datetime
 import warnings
 
-# 모든 경고 무시
-warnings.filterwarnings("ignore")  
 
 class CASS_BOT(nn.Module):
     def __init__(self):
@@ -40,6 +38,8 @@ class CASS_BOT(nn.Module):
         self.audio_frames = []
 
         self.user_input = ""
+        self.stt_order_list = []
+        self.engine = False  # 시동 on, off 유무
 
 
     def get_session_token(self):
@@ -75,8 +75,6 @@ class CASS_BOT(nn.Module):
                     if result:
                         result = re.sub(r'카스|갔을|갔어|가스', 'CASS', result)
                         result = result.replace('시동 거', '시동 꺼')
-                        print('=' * 50)
-                        #print(f"STT Result: {result}")
                         return result
             except InvalidStatusCodeError:
                 pass
@@ -94,14 +92,14 @@ class CASS_BOT(nn.Module):
                         input=True,
                         frames_per_buffer=1024)
 
-        print("Recording started. Press 's' to stop.")
+        #print("음성 인식 중...종료시 's' 키 다시 클릭")
         self.audio_frames = []
 
         while self.recording:
             data = stream.read(1024, exception_on_overflow=False)
             self.audio_frames.append(data)
 
-        print("Recording stopped.")
+        #print("음성 인식 완료")
         stream.stop_stream()
         stream.close()
         p.terminate()
@@ -109,25 +107,25 @@ class CASS_BOT(nn.Module):
 
     def handle_key(self, key):
         try:
-            if key.char == 's':  # Start/Stop recording
+            if key.char == 's': 
                 if not self.recording:
                     self.recording = True
-                    print("Starting recording...")
+                    print("음성 인식 중...종료시 's' 키 클릭")
                     threading.Thread(target=self.record_audio).start()
                 else:
                     self.recording = False
-                    print("Stopping recording...")
+                    print("음성 인식 완료")
 
                     if self.audio_frames:
-                        # 2. Session Token을 획득
+                        # Session Token 획득
                         res = self.get_session_token()
                         sid = res['sessionId']
                         s_token = res['sessionToken']
 
-                        # 3. 오디오 스트림을 서버로 전송
+                        # 오디오 스트림 서버로 전송
                         self.send_audio_stream(b''.join(self.audio_frames), sid, s_token)
 
-                        # 4. 동시에 실시간 STT 결과를 수신
+                        # STT 결과를 수신
                         stt_result = self.get_audio_stream(sid, s_token)
 
                         if stt_result:
@@ -143,47 +141,113 @@ class CASS_BOT(nn.Module):
             pass
 
 
-    def cass_result(self, input):
+    def first_result(self, input):
         chain = RemoteRunnable("https://notable-daily-sunbeam.ngrok-free.app/chat/")
-        cass_output = chain.invoke({"messages": [{"role": "user", "content": input}]})
-        return cass_output
+        output = chain.invoke({"messages": [{"role": "user", "content": input}]})
+        return output
 
     def check_result(self, output):
+        self.flag = None  
         self.stt_order = None
         result = output
         # 시동 켜기
         if '시동' in result and ('걸' in result or '켜' in result):
-            self.stt_order = 'on'
+            if ('off' in self.stt_order_list or self.stt_order_list == []):
+                self.stt_order = 'on'
+                self.engine = True
+                if 'off' in self.stt_order_list:
+                    off_idx = self.stt_order_list.index('off')
+                    self.stt_order_list[off_idx] = 'on' 
+                elif self.stt_order_list == []:
+                    self.stt_order_list.append(self.stt_order)  
+            elif 'on' in self.stt_order_list and self.engine == True:
+                self.flag = 0
+            else:
+                pass
         # 시동 끄기
         elif '시동' in result and ('끄' in result or '꺼' in result):
-            self.stt_order = 'off'
+            if 'on' in self.stt_order_list and not 'go' in self.stt_order_list:
+                self.engine = False
+                self.stt_order = 'off'
+                on_idx = self.stt_order_list.index('on')
+                self.stt_order_list[on_idx] = 'off'
+                self.stt_order_list = [] 
+            elif (self.stt_order_list == [] or 'off' in self.stt_order_list) and self.engine == False:
+                self.flag = 1
+            elif 'go' in self.stt_order_list:
+                self.flag = 5
+            else:
+                pass
         # 주행 시작
         elif '출발' in result or ('주행' in result and '시작' in result):
-            self.stt_order = 'go'
+            if 'on' in self.stt_order_list and self.engine == True: # 시동 켜져 있을 때
+                if 'stop' in self.stt_order_list:
+                    self.stt_order = 'go'
+                    stop_idx = self.stt_order_list.index('stop')
+                    self.stt_order_list[stop_idx] = 'go'
+                elif not 'go' in self.stt_order_list:
+                    self.stt_order = 'go'
+                    self.stt_order_list.append(self.stt_order)
+                else:
+                    self.flag = 2
+            else:
+                self.flag = 4
         # 정차 하기
         elif '정차' in result or '정지' in result or '멈추' in result:
-            self.stt_order = 'stop'
+            if 'on' in self.stt_order_list:  # 시동 켜져 있을 때
+                # self.stt_order = 'stop'
+                if 'go' in self.stt_order_list:
+                    self.stt_order = 'stop'
+                    go_idx = self.stt_order_list.index('go')
+                    self.stt_order_list[go_idx] = 'stop'
+                elif self.stt_order_list == ['on'] or 'stop' in self.stt_order_list:
+                    self.flag = 3
+                else:
+                    pass
+            else:
+                self.flag = 4
         else:
             pass
-        return self.stt_order
+
+        if self.stt_order != None:
+            print('order ---------------------> ', self.stt_order)
+            return self.stt_order
 
 
-    def calc_time(self):
-        now = datetime.now()
-        ampm = None
-        current_hour = now.hour
-        if current_hour >= 12:  # 오후
-            if current_hour == 12:
+    def cass_output(self, input):
+        if '현재 시간' in input or '지금 시간' in input:
+            now = datetime.now()
+            ampm = None
+            current_hour = now.hour
+            if current_hour >= 12:  # 오후
+                if current_hour == 12:
+                    current_hour = current_hour
+                else:
+                    current_hour = current_hour - 12
+                ampm = '오후'
+            else:  # 오전
                 current_hour = current_hour
+                ampm = '오전'
+            current_min = now.minute
+            output = f"현재 시간은 {ampm} {current_hour}시 {current_min}분 입니다."
+        
+        else:
+            if self.flag != None:
+                if self.flag == 0:
+                    output = '이미 시동이 걸려있습니다.'
+                elif self.flag == 1:
+                    output = '이미 시동이 꺼져있습니다.'
+                elif self.flag == 2:
+                    output = '이미 주행 중 입니다.'
+                elif self.flag == 3:
+                    output = '이미 정차해 있는 상태입니다.'
+                elif self.flag == 4:
+                    output = '시동을 먼저 걸어주세요.'
+                else:
+                    output = '주행 중 입니다. 차량을 정차시킨 후 시동을 꺼주세요.'
             else:
-                current_hour = current_hour - 12
-            ampm = '오후'
-        else:  # 오전
-            current_hour = current_hour
-            ampm = '오전'
-        current_min = now.minute
-        current_time = f"현재 시간은 {ampm} {current_hour}시 {current_min}분 입니다."
-        return current_time
+                output = input
+        return output
 
 
     def text_to_speech(self, text):
@@ -195,7 +259,10 @@ class CASS_BOT(nn.Module):
             self.user_input = ""
 
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
+    # 모든 경고 무시
+    # warnings.filterwarnings("ignore")   
+
     print("'s' 키를 눌러 음성 명령, 다시 's' 키를 눌러 명령 종료")
     print("시스템 종료는 'q' 키를 누르세요.")
     print("=" * 50)
@@ -208,19 +275,11 @@ if __name__ == "__main__":
             if cass_bot.user_input:
                 print('CASS_bot activated!')
                 print('user_input : ', cass_bot.user_input)
-                response = cass_bot.cass_result(cass_bot.user_input)
-
-                if '현재 시간은' in response:
-                    response = cass_bot.calc_time()
-
-                # 모델 응답 출력
-                print("CASS 응답:", response)
+                response = cass_bot.first_result(cass_bot.user_input)
                 order = cass_bot.check_result(response)
-                if order != None:
-                    print('order ------------------->', order)
+                final_output = cass_bot.cass_output(response)
+                print("CASS 응답:", final_output)
                 print('=' * 50)
-
-                cass_bot.text_to_speech(response)
-            
+                cass_bot.text_to_speech(final_output)
             else:
                 break

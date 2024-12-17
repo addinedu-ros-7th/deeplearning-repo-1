@@ -8,15 +8,22 @@ import numpy as np
 
 # 모델 정의 (간단한 CNN 모델)
 class EmergencyRecognizer(nn.Module):
-    def __init__(self, input_size=40, n_classes=2):
+    def __init__(self, input_size=120, n_classes=2):
         super(EmergencyRecognizer, self).__init__()
         self.set_params(input_size=input_size, n_classes=n_classes)
         
-        self.conv1 = nn.Conv1d(input_size, 32, kernel_size=3, stride=1)
-        self.conv2 = nn.Conv1d(32, 64, kernel_size=3, stride=1)
-        self.conv3 = nn.Conv1d(64, 128, kernel_size=3, stride=1)
-        self.dropout = nn.Dropout(0.2)
-        self.fc = nn.Linear(128, n_classes)
+        self.conv1 = nn.Sequential(
+            nn.Conv1d(input_size, 512, kernel_size=3, stride=1),
+            nn.MaxPool1d(kernel_size=2, stride=2),
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv1d(512, 512, kernel_size=3, stride=1),
+            nn.MaxPool1d(kernel_size=2, stride=2),
+        )
+        self.conv3 = nn.Sequential(
+            nn.Conv1d(512, 512, kernel_size=3, stride=1),
+        )
+        self.fc = nn.Linear(512, n_classes)
     
     def forward(self, x):
         x = torch.relu(self.conv1(x))  # 첫 번째 convolution 레이어
@@ -26,7 +33,7 @@ class EmergencyRecognizer(nn.Module):
         x = self.fc(x)  # Fully connected layer
         return x
     
-    def set_params(self, input_size=40, n_classes=2, sample_rate=16000):
+    def set_params(self, input_size=120, n_classes=2, sample_rate=16000):
         # 파라미터 설정
         self.target_sample_rate = sample_rate  # 타겟 샘플 속도
         self.n_mfcc = input_size  # MFCC의 수
