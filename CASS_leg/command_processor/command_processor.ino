@@ -1,40 +1,12 @@
 #include <WiFi.h>
 
+// 환경 세팅
 const char* ssid = "AIE_509_2.4G";  // WIFI
 const char* password = "addinedu_class1";   // WIFI 비밀번호
 
-const int RED1 = 13;
-const int RED2 = 4;
-const int BLUE1 = 18;
-
-const int speed = 100;
-int steering_mode;
-int steering_cnt = 0;
-
-const int basic_left_speed = speed + 40;
-const int basic_right_speed = speed;
-
-int curr_right_speed;
-int curr_left_speed;
-
-struct Delta{
-  int l_delta;
-  int r_delta;
-};
-
-Delta d = {0, 0};
-Delta brake = {0, 0};
-
-bool steer_ON = false;
-bool Siren = false;
-bool prev_siren = true;
-
-// LED, 부저 millis() 세팅
-unsigned long LED_start_time = 0;
-const unsigned long LED_DELAY_TIME = 5000;
-
-
-bool BLUE_ON = false;
+const int RED1 = 13; // 후미등 1
+const int RED2 = 4; // 후미등 2
+const int BLUE1 = 18; // 차주 인식등
 
 const int motor_R_forward = 21;  // 오른쪽 정방향 IN1
 const int motor_R_reverse = 19;  // 오른쪽 역박향 IN2
@@ -42,18 +14,53 @@ const int motor_R_reverse = 19;  // 오른쪽 역박향 IN2
 const int motor_L_forward = 26;  // 왼쪽 정방향 IN3
 const int motor_L_reverse = 27;  // 왼쪽 역박향 IN4
 
+
+// 정지 및 직후진, L1~3, R1~3 모드 저장용 변수
+int steering_mode;
+
+// 차량 기본 속도 세팅
+const int speed = 100;
+const int basic_left_speed = speed + 40;
+const int basic_right_speed = speed;
+
+// 현재 좌우측륜 속력 저장용 변수
+int curr_right_speed;
+int curr_left_speed;
+
+// 좌우측륜 가감속 구조체
+struct Delta{
+  int l_delta;
+  int r_delta;
+};
+Delta d = {0, 0}; // 기본 가감속
+Delta brake = {0, 0}; // Siren 전용 감속 변수
+
+// 싸이렌 응급상황 대응변수
+bool Siren = false;
+bool prev_siren = true;
+
+// LED, 부저 millis() 세팅
+unsigned long LED_start_time = 0;
+const unsigned long LED_DELAY_TIME = 5000;
+
+// BLUE LED 변수
+bool BLUE_ON = false;
+
+// 탑승자 무반응 비상상황 대응변수
 bool Emergency_Signal = false;
 int Emergency_cnt = 0;
 
+// 주행상황 플래그 변수 (정지 및 직후진)
 bool StopFlag = true;
 bool BackFlag = false;
 
 // 속도 출력용 변수
 int show_speed = 0;
 
+
 WiFiServer server(500);
 
-
+// BLUE LED 동작 함수
 void LED_startTimer()
   {
     LED_start_time = millis();
@@ -74,7 +81,7 @@ bool LED_checkTimer()
   return false;
 }
 
-
+// 직진
 void GO_FORWARD()
 {
   curr_left_speed = basic_left_speed + d.l_delta-brake.l_delta;
@@ -88,6 +95,7 @@ void GO_FORWARD()
 
 }
 
+// 후진
 void GO_BACK()
 {
   curr_left_speed = basic_left_speed + d.l_delta-brake.l_delta;
@@ -100,6 +108,7 @@ void GO_BACK()
   analogWrite(motor_L_reverse, curr_left_speed);
 }
 
+// 정지
 void STOP()
 {
   curr_left_speed = basic_left_speed + d.l_delta;
@@ -112,6 +121,7 @@ void STOP()
   analogWrite(motor_L_reverse, curr_left_speed);
 }
 
+// 탑승자 무반응 비상상황
 void Emergency()
 {
   if (Emergency_cnt < 10)
@@ -167,7 +177,6 @@ void setup() {
   pinMode(RED2, OUTPUT);
   pinMode(BLUE1, OUTPUT);
 
-
   pinMode(motor_R_forward, OUTPUT);
   pinMode(motor_R_reverse, OUTPUT);
 
@@ -199,6 +208,7 @@ void loop() {
     String data = client.readStringUntil('\n'); // 줄바꿈("\n") 기준으로 데이터 읽기 
     data.trim(); // 데이터 앞뒤 공백 제거
 
+    // 서버로부터 명령어 수신
     switch (data.toInt()) {
 
       case 11: // 연결 확인
@@ -213,81 +223,70 @@ void loop() {
         break;
 
       case 31: // 직진
-        // client.print("drive\n");
           BackFlag = false;
           StopFlag = false;
           steering_mode = 1;
         break;
 
       case 32: // 정지
-        // client.print("stop\n");
         steering_mode = 0;
         BackFlag = false;
         StopFlag = true;
         break;
 
       case 33: // 후진
-        // client.println("reverse\n");
         BackFlag = true;
         steering_mode = 1;
         StopFlag = false;
         break;
 
       case 34:
-        // client.print("accel\n");
         steering_mode = 8;
         StopFlag = false;
         break;
       
       case 41: // L1
-        // client.print("L1\n");
         StopFlag = false;
         steering_mode = 2;    
         break;
       
       case 42: // L2
-        // client.println("L2\n");
         StopFlag = false;
         steering_mode = 3;
 
         break;
 
       case 43: // L3
-        // client.println("L3\n");
         StopFlag = false;
         steering_mode = 4;
         break;
 
       case 51: // R1
-        // client.println("R1\n");
         StopFlag = false;
         steering_mode = 5;
         break;
 
       case 52: // R2
-        // client.print("R2\n");
         StopFlag = false;
         steering_mode = 6;
         break;
       
       case 53: // R3
-        // client.print("R3\n");
         StopFlag = false;
         steering_mode = 7;        
         break;
 
       case 88: // 갓길 주차
-        // client.print("Side park\n");
         Siren = true;
         break;
 
       case 99: // 비상 제동
-        // client.print("Emergency Breaking\n");
         StopFlag = false;
         Emergency_Signal = true;
         break;
     }
 
+    // 명령별 조향모드 설정 (기본 가감속 구조체 변수 'd' 사용)
     switch (steering_mode) {
       case 0: // 정지
         d = {-basic_left_speed, -basic_right_speed};
@@ -325,11 +324,11 @@ void loop() {
         break;
     }
 
-    if(Siren && prev_siren)
+    if(Siren && prev_siren) // 응급상황 감속
     {
-      Serial.println("siren 반복문 재진입");
-      if (steering_mode > 0)
+      if (steering_mode > 0) // 정지 제외 나머지 모드에서만 작동
       {
+        // Siren 전용 감속 구조체 변수 'brake' 사용
         brake.l_delta+=1;
         brake.r_delta+=1;
         delay(15);
@@ -349,7 +348,7 @@ void loop() {
           }
         }
       }
-      if (curr_right_speed <= 0 || curr_left_speed <= 0)
+      if (curr_right_speed <= 0 || curr_left_speed <= 0) // 감속 중에 현재속도 음수될 시 정차
       {
         d = {-basic_left_speed, -basic_right_speed};
         brake = {0, 0};
@@ -360,31 +359,30 @@ void loop() {
       }
 
     } 
-    else
+    else // 응급상황 아닐 시 정상주행
     {
       prev_siren = true;
-      if (StopFlag)
+      if (StopFlag) // 정지 플래그 true - 정지
       {
         STOP();
         digitalWrite(RED1, HIGH);
         digitalWrite(RED2, HIGH);
       }
-      else
+      else // 정지 플래그 false - 직진 혹은 후진
       {
         digitalWrite(RED1, LOW);
         digitalWrite(RED2, LOW);
-        if (BackFlag)
+        if (BackFlag) // 후진 플래그 true - 후진
         {
           GO_BACK();
         }
-        else
+        else // 후진 플래그 false - 직진
         {
           GO_FORWARD();
         }
         
       } 
     }
-    
 
     //LED 작동함수
     if (BLUE_ON && LED_checkTimer())
