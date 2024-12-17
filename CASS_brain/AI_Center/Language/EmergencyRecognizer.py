@@ -12,11 +12,10 @@ class EmergencyRecognizer(nn.Module):
         super(EmergencyRecognizer, self).__init__()
         self.set_params(input_size=input_size, n_classes=n_classes)
         
-        self.conv1 = nn.Conv1d(input_size, 32, kernel_size=3, stride=1)
-        self.conv2 = nn.Conv1d(32, 64, kernel_size=3, stride=1)
-        self.conv3 = nn.Conv1d(64, 128, kernel_size=3, stride=1)
-        self.dropout = nn.Dropout(0.2)
-        self.fc = nn.Linear(128, n_classes)
+        self.conv1 = nn.Conv1d(input_size, 512, kernel_size=3, stride=1)
+        self.conv2 = nn.Conv1d(512, 512, kernel_size=3, stride=1)
+        self.conv3 = nn.Conv1d(512, 512, kernel_size=3, stride=1)
+        self.fc = nn.Linear(512, n_classes)
     
     def forward(self, x):
         x = torch.relu(self.conv1(x))  # 첫 번째 convolution 레이어
@@ -107,7 +106,7 @@ class EmergencyRecognizer(nn.Module):
         self.check = None
         self.frame_buffer = np.zeros((self.chunk*buffer_size))  # 1024 샘플을 버퍼에 저장 (모노 채널 가정)
 
-    def RTstreaming(self, mode='qt'):
+    def RTsteaming(self, mode='qt'):
         if mode=='qt':
             # 오디오 청크 읽기
             audio_data = self.stream.read(self.chunk)
