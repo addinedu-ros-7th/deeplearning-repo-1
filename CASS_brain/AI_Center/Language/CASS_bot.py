@@ -242,7 +242,7 @@ class CASS_BOT(nn.Module):
                 elif self.flag == 3:
                     output = '이미 정차해 있는 상태입니다.'
                 elif self.flag == 4:
-                    output = '시동을 먼저 켜주세요.'
+                    output = '시동을 먼저 걸어주세요.'
                 else:
                     output = '주행 중 입니다. 차량을 정차시킨 후 시동을 꺼주세요.'
             else:
