@@ -75,6 +75,7 @@ class CASS_BOT(nn.Module):
                     if result:
                         result = re.sub(r'카스|갔을|갔어|가스', 'CASS', result)
                         result = result.replace('시동 거', '시동 꺼')
+                        result = result.replace('스탑', '스톱')
                         return result
             except InvalidStatusCodeError:
                 pass
@@ -179,7 +180,7 @@ class CASS_BOT(nn.Module):
             else:
                 pass
         # 주행 시작
-        elif '출발' in result or ('주행' in result and '시작' in result):
+        elif '출발' in result or ('주행' in result and ('시작' in result or '재개' in result)):
             if 'on' in self.stt_order_list and self.engine == True: # 시동 켜져 있을 때
                 if 'stop' in self.stt_order_list:
                     self.stt_order = 'go'
@@ -246,7 +247,10 @@ class CASS_BOT(nn.Module):
                 else:
                     output = '주행 중 입니다. 차량을 정차시킨 후 시동을 꺼주세요.'
             else:
-                output = input
+                if len(input) >= 12 and '네, 여기 있습니다.' in input:
+                    output = input.replace('네, 여기 있습니다.', '')
+                else:
+                    output = input
         return output
 
 
@@ -261,7 +265,7 @@ class CASS_BOT(nn.Module):
 
 if __name__ == "__main__":
     # 모든 경고 무시
-    # warnings.filterwarnings("ignore")   
+    warnings.filterwarnings("ignore")   
 
     print("'s' 키를 눌러 음성 명령, 다시 's' 키를 눌러 명령 종료")
     print("시스템 종료는 'q' 키를 누르세요.")
