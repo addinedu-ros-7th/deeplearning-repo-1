@@ -20,7 +20,7 @@ register_file = "Register.ui"
 form_class = uic.loadUiType(ui_file)[0]
 form_register_class = uic.loadUiType(register_file)[0]
 
-ESP32_IP = "192.168.0.28"
+ESP32_IP = "192.168.0.56"
 ESP32_PORT = 500
 
 index = True
@@ -52,9 +52,9 @@ class MainWindow(QMainWindow, form_class):
         self.detect_model = ObjectDetection('bestDetect.pt')
         self.segment_model = LaneSegmentation('bestSeg.pt')
 
-        self.emergency_model = EmergencyRecognizer().cuda()
+        self.emergency_model = EmergencyRecognizer(input_size=120).cuda()
         self.emergency_model.load_state_dict(torch.load('emergency2.pt'))
-        self.emergency_model.RTparameter_setting()
+        self.emergency_model.RTparameter_setting(buffer_size=30)
         self.voice_id_model = VoiceRecognizer(input_size=120, n_classes=6).cuda()
         self.voice_id_model.load_state_dict(torch.load('Voice_Check.pt'))
         self.cass_bot = CASS_BOT()
@@ -170,6 +170,7 @@ class MainWindow(QMainWindow, form_class):
         self.labelSelectRoad.setPixmap(QPixmap("./icons/selectRoad.png"))
         self.labelSelectRoadLeft.setPixmap(QPixmap("./icons/selectRoadLeft.png"))
         self.labelSelectRoadRight.setPixmap(QPixmap("./icons/selectRoadRight.png"))
+        self.labelSelectRoadSidepark.setPixmap(QPixmap("./icons/selectRoadSidepark.jpg"))
 
     def setLabels(self):
         self.labelRec.hide()
@@ -188,6 +189,7 @@ class MainWindow(QMainWindow, form_class):
 
         self.labelSelectRoadLeft.hide()
         self.labelSelectRoadRight.hide()
+        self.labelSelectRoadSidepark.hide()
 
     def setStates(self):
         self.duration = 0
@@ -221,6 +223,8 @@ class MainWindow(QMainWindow, form_class):
         self.order = None
         self.ab_order = None
         self.curFlag = None
+        self.check = True
+        self.emergency = None
 
     def updateUI(self, objs, direction, select_road):     
         objs = set(objs)
@@ -272,6 +276,10 @@ class MainWindow(QMainWindow, form_class):
             print("updateUI", select_road)
         else:
             self.labelSelectRoadRight.hide()
+        if 'side_park' == select_road:
+            self.labelSelectRoadSidepark.show()
+        else:
+            self.labelSelectRoadSidepark.hide()
 
     def setBtns(self):
         self.btnRegister.hide()
@@ -317,31 +325,31 @@ class MainWindow(QMainWindow, form_class):
         """
 
         if event.key() == Qt.Key_W:
-            if self.isDrive == False:
-                message = self.TCP.encodeMsg("drive")
-                self.sendMsg(message)
-            else:
-                self.setDirection("straight")
+            # if self.isDrive == False:
+            #     message = self.TCP.encodeMsg("drive")
+            #     self.sendMsg(message)
+            # else:
+            #     self.setDirection("straight")
 
-            # self.setDirection("straight")
+            self.setDirection("straight")
 
         elif event.key() == Qt.Key_A:
-            if self.isDrive == False:
-                message = self.TCP.encodeMsg("L1")
-                self.sendMsg(message)
-            else:
-                self.setDirection("left")
+            # if self.isDrive == False:
+            #     message = self.TCP.encodeMsg("L1")
+            #     self.sendMsg(message)
+            # else:
+            #     self.setDirection("left")
 
-            # self.setDirection("left")
+            self.setDirection("left")
 
         elif event.key() == Qt.Key_D:
-            if self.isDrive == False:
-                message = self.TCP.encodeMsg("R1")
-                self.sendMsg(message)
-            else:
-                self.setDirection("right")
+            # if self.isDrive == False:
+            #     message = self.TCP.encodeMsg("R1")
+            #     self.sendMsg(message)
+            # else:
+            #     self.setDirection("right")
 
-            # self.setDirection("right")
+            self.setDirection("right")
 
         elif event.key() == Qt.Key_S:
             if self.isDrive == True:
@@ -357,8 +365,8 @@ class MainWindow(QMainWindow, form_class):
         elif event.key() == Qt.Key_O:
             self.driveState()
             
-        elif event.key() == Qt.Key_R:
-            self.clickRecord()
+        # elif event.key() == Qt.Key_R:
+        #     self.clickRecord()
 
         # for testing
         elif event.key() == Qt.Key_T:
@@ -369,10 +377,12 @@ class MainWindow(QMainWindow, form_class):
         elif event.key() == Qt.Key_E:
             message = self.TCP.encodeMsg("emergency")
             self.sendMsg(message)
-            self.emergency = "Emergency"
 
         elif event.key() == Qt.Key_K:
             self.selectRoad("side_park")
+            self.emergency = "Emergency"
+        elif event.key() == Qt.Key_L:
+            self.emergency = "Normal"
         elif event.key() == Qt.Key_V:
             self.voiceAuthentification()
 
@@ -425,6 +435,7 @@ class MainWindow(QMainWindow, form_class):
         self.btnRegister.hide()
         self.legCamOn()
         self.btnCamOn.hide()
+        self.sendMsg("21")
         self.authentified = True
 
     def clickRecord(self):
@@ -585,17 +596,20 @@ class MainWindow(QMainWindow, form_class):
     def updateEmergency(self):
         self.emergency = self.emergency_model.RTstreaming()
         print(self.emergency)
-
         if self.emergency == "Emergency":
             self.isEmergency1 = True
-            self.count += 1
+            # self.count += 1
 
-            # if self.count > 6:
-            self.selectRoad("side_park")
-            self.labelThread.show()
+            self.labelThread.show() 
             self.labelThread.setText("Emergency Situation")
             self.labelThread.setStyleSheet("background-color: red; color: white; font-size: 20px;")
-            
+            # if self.count > 6:
+
+            # if self.isEmergency1 != self.isEmergency2:
+                # self.selectRoad("side_park")
+                # self.isEmergency2 = True
+                # print("emergency occured select road ", self.select_road)
+                
             # if self.count % 4 == 0:
             #     self.labelThread.setStyleSheet("background-color: black; color: white; font-size: 20px;")
             # else:
@@ -604,9 +618,10 @@ class MainWindow(QMainWindow, form_class):
         else:
             self.isEmergency1 = False
             self.isEmergency2 = False
-            self.count = 0
+            # self.count = 0
             self.labelThread.hide()
-            self.selectRoad("center")
+            if self.select_road == "side_park":
+                self.selectRoad("center")
 
     def authentification(self, frame):
         '''
@@ -651,19 +666,21 @@ class MainWindow(QMainWindow, form_class):
                         # """
                     if self.duration > 6:
                         if self.isDrowsy1 != self.isDrowsy2:
-                            print("why u dont get here")
                             self.labelLegCam.setStyleSheet("border: 5px solid red")
                             self.selectRoad("side_park")
+                        self.isDrowsy2 = True
                             
             else:
                 self.start = time.time()
                 self.labelLegCam.setStyleSheet("")
                 self.isDrowsy1 = False
+                self.isDrowsy2 = False
                 # if self.isRecording == True:
                 #     self.clickRecord()
         except:
             self.start = time.time()
             self.isDrowsy1 = False
+            self.isDrowsy2 = False
             self.labelFaceCam.setStyleSheet("border: 1px solid white")
 
     def updateFaceCam(self):
@@ -682,8 +699,8 @@ class MainWindow(QMainWindow, form_class):
             if self.authentified == False:
                 self.authentification(frame)
             
-            else:
-                self.drowsyDetection(frame)
+            # else:
+            #     self.drowsyDetection(frame)
 
             h, w, c = frame.shape
             qImg = QImage(frame, w, h, w*c, QImage.Format_RGB888)
@@ -719,24 +736,30 @@ class MainWindow(QMainWindow, form_class):
 
                 if not(is_side) and self.select_road != 'center':
                     self.select_road = 'center'
-                if avoid != self.avoid_check and self.check:
-                    self.check = False
+                
+                if obstacle != None:
+                    self.avoid_check = True
+                    self.select_road = 'left'
                     self.st = time.time()
-                    if avoid:
-                        self.avoid_check = avoid
-                        self.select_road = 'left'
+                else: 
+                    if self.dt > 4 and self.dt < 8:
+                        self.select_road = 'right'
                     else:
                         self.select_road = 'center'
-                        self.avoid_check = avoid
+                    print(self.dt)
 
-                if self.avoid_check:
+                    if self.dt > 10:
+                        self.avoid_check = False
+                        self.st = 0
+                        self.et = 0
+                        self.dt = 0
+                \
+                if self.avoid_check and obstacle==None:
                     self.et = time.time()
                     self.dt = self.et - self.st
-                    if self.dt > 2 and self.dt <= 6:
-                        self.select_road = 'right'
-                    elif self.dt > 6:
-                        self.st = time.time()
-                        self.check = True
+                    
+                print(self.select_road)
+
             except:
                 pass
 
@@ -771,7 +794,7 @@ class MainWindow(QMainWindow, form_class):
                                 response = "L1"
                                 if slope < th_l - -20:
                                     response = "L3"
-                                    if self.select_road == "side_park":
+                                    if self.select_road == "left" or self.select_road == "side_park":
                                         response = "L2"
 
                                 # elif slope < th_l - th_2 - th_2:
@@ -780,7 +803,10 @@ class MainWindow(QMainWindow, form_class):
                         else:
                             response = "drive"
                     except:
-                        response = "no driveway"
+                        if self.select_road == "center":
+                            response = "no driveway"
+                        else:
+                            response = response
                         # response = response
                 else:
                     response = "stop"
@@ -793,17 +819,17 @@ class MainWindow(QMainWindow, form_class):
             if self.ab_order == "stop":
                 response = "stop"
 
-            if self.select_road == "side_park":
-                response = "side_parking"
+            # if self.select_road == "side_park":
             
             if self.isEmergency1 != self.isEmergency2:
-                print("select road : ", self.select_road)
-            
+                response = "side_parking"
+                self.selectRoad("side_park")
+                self.isEmergency2 = True
+                print("emergency occured select road ", self.select_road)
+            # print("select road:", self.select_road, response)
 
             if response == "no driveway":
                 response = "reverse"
-                
-            # self.labelState.setText(response)
 
             if response != self.curFlag: # and response != "no driveway":
                 self.curFlag = response
