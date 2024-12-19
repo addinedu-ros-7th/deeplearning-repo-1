@@ -44,11 +44,9 @@ class CASS_BOT(nn.Module):
         self.stt_order_list = []
         self.engine = False 
 
-
     def get_session_token(self):
         headers = {'Authorization': f'Bearer {self.API_TOKEN}'}
         return requests.get(self.HOST + "/stt/v1/stream/sessionTokens", headers=headers).json()
-
 
     def send_audio_stream(self, audio_stream: bytes, sid: str, s_token: str):
         headers = {'Authorization': f'Bearer {s_token}', 'Content-Type': 'application/json'}
@@ -66,7 +64,6 @@ class CASS_BOT(nn.Module):
             print(f"Error sending audio: {e}")
 
         requests.post(self.HOST + "/stt/v1/stream/recognize", headers=headers, json=data)
-
 
     def get_audio_stream(self, sid: str, s_token: str):
         headers = {'Authorization': f'Bearer {s_token}'}
@@ -113,7 +110,6 @@ class CASS_BOT(nn.Module):
         stream.close()
         p.terminate()
 
-
     def handle_key(self, key):
         try:
             if key.char == 's': 
@@ -149,7 +145,6 @@ class CASS_BOT(nn.Module):
                 return False
         except AttributeError:
             pass
-
 
     def first_result(self, input):
         chain = RemoteRunnable("https://notable-daily-sunbeam.ngrok-free.app/chat/")
@@ -222,7 +217,6 @@ class CASS_BOT(nn.Module):
             print('order ---------------------> ', self.stt_order)
             return self.stt_order
 
-
     def cass_output(self, input):
         if '현재 시간' in input or '지금 시간' in input:
             now = datetime.now()
@@ -261,14 +255,13 @@ class CASS_BOT(nn.Module):
                     output = input
         return output
 
-
     def text_to_speech(self, text):
         tts = gTTS(text=text, lang='ko', slow=False)
         # 임시 파일 생성
         with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as temp_file:
             tts.save(temp_file.name)  # TTS 결과 저장
             playsound(temp_file.name)  # 음성 재생
-            self.user_input = ""
+            self.user_input = ""  # input 초기화
 
     async def handle_user_input(self):
         if self.user_input:
@@ -293,7 +286,7 @@ class CASS_BOT(nn.Module):
     def run(self):
         # asyncio 이벤트 루프를 별도의 스레드에서 실행
         loop_thread = threading.Thread(target=self.start_event_loop)
-        loop_thread.daemon = True  # 프로그램 종료 시 자동 종료
+        loop_thread.daemon = True
         loop_thread.start()
 
     def start_event_loop(self):

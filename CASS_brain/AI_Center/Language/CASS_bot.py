@@ -208,7 +208,6 @@ class CASS_BOT(nn.Module):
         # 정차 하기
         elif '정차' in result or '정지' in result or '멈추' in result:
             if 'on' in self.stt_order_list:  # 시동 켜져 있을 때
-                # self.stt_order = 'stop'
                 if 'go' in self.stt_order_list:
                     self.stt_order = 'stop'
                     go_idx = self.stt_order_list.index('go')
