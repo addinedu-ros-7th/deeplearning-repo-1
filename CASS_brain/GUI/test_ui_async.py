@@ -3,13 +3,28 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon, QPixmap, QImage
 from PyQt5 import uic
 from Modules import *
-
+from pynput import keyboard
+import wave
+import socket
+# 서버 설정
+import pyaudio
 import os 
 import cv2
 import sys
 import time
 import asyncio
+import threading
 from datetime import datetime
+
+import sounddevice as sd
+from scipy.io.wavfile import write
+import numpy as np
+
+
+
+# Example usage
+# record_audio("Person/soyoung.wav", duration=3)
+
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from AI_Center import *
@@ -20,7 +35,7 @@ register_file = "Register.ui"
 form_class = uic.loadUiType(ui_file)[0]
 form_register_class = uic.loadUiType(register_file)[0]
 
-ESP32_IP = "192.168.0.56"
+ESP32_IP = "192.168.0.28"
 ESP32_PORT = 500
 
 index = True
@@ -33,6 +48,7 @@ class MainWindow(QMainWindow, form_class):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("CASS Driving")
+        self.cass_bot = CASS_BOT()
 
         self.setThreads()
         self.setStates()
@@ -54,10 +70,9 @@ class MainWindow(QMainWindow, form_class):
 
         self.emergency_model = EmergencyRecognizer(input_size=120).cuda()
         self.emergency_model.load_state_dict(torch.load('emergency2.pt'))
-        self.emergency_model.RTparameter_setting(buffer_size=30)
+        self.emergency_model.RTparameter_setting(buffer_size=20)
         self.voice_id_model = VoiceRecognizer(input_size=120, n_classes=6).cuda()
         self.voice_id_model.load_state_dict(torch.load('Voice_Check.pt'))
-        self.cass_bot = CASS_BOT()
     
         self.setLabelCams()
         self.cameraOn()
@@ -65,10 +80,11 @@ class MainWindow(QMainWindow, form_class):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.process_events)
         self.timer.start(100)
-        self.emergencyTh.start(100)
+        # self.emergencyTh.start(100)
 
         self.reader = None
         self.writer = None
+
 
         # self.reader, self.writer = asyncio(self.connect_async())
         asyncio.ensure_future(self.connect_async())
@@ -79,6 +95,51 @@ class MainWindow(QMainWindow, form_class):
         self.lineEdit.returnPressed.connect(self.changeThreshold)
         self.lineEdit_3.returnPressed.connect(self.changeThreshold_2)
         self.lineEdit_2.returnPressed.connect(self.changeGear)
+        self.vkey = ''
+
+    def get_soket_data(self, data):
+        data = data.split(' : ')
+        key = data[0]
+        value = data[1]
+        if 'Bot' in key:
+            print(f"Received from Bot: {value}")
+            response = f"Server resend to Bot: {value}"
+
+        else:
+            print(f"Received from Siren: {value}")
+            response = f"Server resend to Siren: {value}"
+            self.updateEmergency(value)          
+        # 클라이언트 연결 수락
+        self.serverSoket.client_socket.send(response.encode('utf-8'))
+
+    def updateEmergency(self, value):
+        # print(self.emergency)
+        if value == "Emergency":
+            self.isEmergency1 = True
+            # self.count += 1
+
+            self.labelThread.show() 
+            self.labelThread.setText("Emergency Situation")
+            self.labelThread.setStyleSheet("background-color: red; color: white; font-size: 20px;")
+            # if self.count > 6:
+
+            # if self.isEmergency1 != self.isEmergency2:
+                # self.selectRoad("side_park")
+                # self.isEmergency2 = True
+                # print("emergency occured select road ", self.select_road)
+                
+            # if self.count % 4 == 0:
+            #     self.labelThread.setStyleSheet("background-color: black; color: white; font-size: 20px;")
+            # else:
+            #     self.labelThread.setStyleSheet("background-color: red; color: white; font-size: 20px;")
+
+        else:
+            self.isEmergency1 = False
+            self.isEmergency2 = False
+            # self.count = 0
+            self.labelThread.hide()
+            if self.select_road == "side_park":
+                self.selectRoad("center")
 
     def changeThreshold(self):
         self.threshold = self.lineEdit.text()
@@ -94,10 +155,17 @@ class MainWindow(QMainWindow, form_class):
         self.sendMsg(self.gear)
 
     def process_events(self):
-        loop = asyncio.get_event_loop()
-        loop.call_soon(loop.stop)
-        loop.run_forever()
-
+        # loop = asyncio.get_event_loop()
+        # loop.call_soon(loop.stop)
+        # loop.run_forever()
+        try:
+            loop = asyncio.get_event_loop()
+            loop.call_soon(loop.stop)
+            loop.run_forever()
+        except RuntimeError:
+            # 현재 스레드에 이벤트 루프가 없는 경우 새로 생성
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
     async def connect_async(self):
         try:
             self.reader, self.writer = await asyncio.open_connection(ESP32_IP, ESP32_PORT)
@@ -135,9 +203,10 @@ class MainWindow(QMainWindow, form_class):
     def sendMsg(self, message):
         if self.writer:
             asyncio.ensure_future(self.async_send_message(message))
-            print(message)
+            # print(message)
         else:
-            print("No writer available push key_C for reconnect")
+            # print("No writer available push key_C for reconnect")
+            pass
 
         # print(message)
 
@@ -281,10 +350,12 @@ class MainWindow(QMainWindow, form_class):
         else:
             self.labelSelectRoadSidepark.hide()
 
+
+        
     def setBtns(self):
         self.btnRegister.hide()
 
-        self.btnRec.clicked.connect(self.cassBot)
+        # self.btnRec.clicked.connect(self.cassBot)
 
         self.btnPower.clicked.connect(self.driveState)
         self.btnForward.clicked.connect(lambda: self.setDirection("straight"))
@@ -322,7 +393,11 @@ class MainWindow(QMainWindow, form_class):
         C : connect to esp32 
         E : emergency stop
         V : voice authentification
+
+        B : Start_ChatBot
+        N : Quit_ChatBot
         """
+
 
         if event.key() == Qt.Key_W:
             # if self.isDrive == False:
@@ -385,6 +460,7 @@ class MainWindow(QMainWindow, form_class):
             self.emergency = "Normal"
         elif event.key() == Qt.Key_V:
             self.voiceAuthentification()
+
 
     def voiceAuthentification(self):
         # print(self.authentified)
@@ -526,13 +602,14 @@ class MainWindow(QMainWindow, form_class):
         self.record.daemon = True
         self.record.update.connect(self.updateRecording)
 
-        self.emergencyTh = Thread()
-        self.emergencyTh.daemon = True
-        self.emergencyTh.update.connect(self.updateEmergency)
+        # self.emergencyTh = Thread()
+        # self.emergencyTh.daemon = True
+        # self.emergencyTh.update.connect(self.updateEmergency)
 
-        # self.cassbot = Thread()
-        # self.cassbot.daemon = True
-        # self.cassbot.update.connect(self.cassBot)
+        self.serverSoket = SeverSocket()
+        self.serverSoket.daemon = True
+        self.serverSoket.update.connect(self.get_soket_data)
+
     
     def setLabelCams(self):
         
@@ -559,11 +636,16 @@ class MainWindow(QMainWindow, form_class):
             self.legCam.start()
             self.legCam.isRunning = True
             self.legVideo = cv2.VideoCapture(legCamID)
+            self.serverSoket.start()
+            self.serverSoket.isRunning = True
+            # self.voice_chat.start()
+            # self.voice_chat.isRunning = True
 
     def legCamOn(self):
         '''
         in case not using face_recognition
         '''
+        print('Leg Cam ON')
         self.sendMsg("21") # "soyoung" ^.^
 
         self.labelFaceCam.hide()
@@ -573,15 +655,21 @@ class MainWindow(QMainWindow, form_class):
 
         self.authentified = True
 
-    def cassBot(self):
-        print("cass bot ready")
-        response = self.cass_bot.cass_result(self.cass_bot.user_input)
-        print("resonse", response)
-        order = self.cass_bot.check_result(response)
-        print("order", order)
-        self.labelThread.setText(str(order))
-        self.labelThread.show()
-        self.cass_bot.text_to_speech(response)
+    # def cassBot(self, key=''):
+    #     self.VoiceChat(key)
+
+    #     if self.cass_bot.user_input:
+    #         print("cass bot ready")
+    #         print('user input :', self.cass_bot.user_input)
+    #         response = self.cass_bot.first_result(self.cass_bot.user_input)
+    #         order = self.cass_bot.check_result(response)
+    #         final_output = self.cass_bot.cass_output(response)
+    #         print("CASS 응답:", final_output)
+    #         self.labelThread.setText(str(order))
+    #         self.labelThread.show()
+    #         self.cass_bot.text_to_speech(final_output)
+    #     else:
+    #         return
 
     def emergencyDetection(self):
         if self.emergency == "Emergency":
@@ -593,35 +681,7 @@ class MainWindow(QMainWindow, form_class):
         else:
             pass
 
-    def updateEmergency(self):
-        self.emergency = self.emergency_model.RTstreaming()
-        print(self.emergency)
-        if self.emergency == "Emergency":
-            self.isEmergency1 = True
-            # self.count += 1
 
-            self.labelThread.show() 
-            self.labelThread.setText("Emergency Situation")
-            self.labelThread.setStyleSheet("background-color: red; color: white; font-size: 20px;")
-            # if self.count > 6:
-
-            # if self.isEmergency1 != self.isEmergency2:
-                # self.selectRoad("side_park")
-                # self.isEmergency2 = True
-                # print("emergency occured select road ", self.select_road)
-                
-            # if self.count % 4 == 0:
-            #     self.labelThread.setStyleSheet("background-color: black; color: white; font-size: 20px;")
-            # else:
-            #     self.labelThread.setStyleSheet("background-color: red; color: white; font-size: 20px;")
-
-        else:
-            self.isEmergency1 = False
-            self.isEmergency2 = False
-            # self.count = 0
-            self.labelThread.hide()
-            if self.select_road == "side_park":
-                self.selectRoad("center")
 
     def authentification(self, frame):
         '''
@@ -746,7 +806,7 @@ class MainWindow(QMainWindow, form_class):
                         self.select_road = 'right'
                     else:
                         self.select_road = 'center'
-                    print(self.dt)
+                    # print(self.dt)
 
                     if self.dt > 10:
                         self.avoid_check = False
@@ -758,7 +818,7 @@ class MainWindow(QMainWindow, form_class):
                     self.et = time.time()
                     self.dt = self.et - self.st
                     
-                print(self.select_road)
+                # print(self.select_road)
 
             except:
                 pass
@@ -823,13 +883,16 @@ class MainWindow(QMainWindow, form_class):
             
             if self.isEmergency1 != self.isEmergency2:
                 response = "side_parking"
+                message = self.TCP.encodeMsg(response)
+                self.sendMsg(message)
                 self.selectRoad("side_park")
                 self.isEmergency2 = True
                 print("emergency occured select road ", self.select_road)
+                self.setStates() 
             # print("select road:", self.select_road, response)
 
             if response == "no driveway":
-                response = "reverse"
+                response = "stop"
 
             if response != self.curFlag: # and response != "no driveway":
                 self.curFlag = response
