@@ -7,6 +7,7 @@ import torch.nn as nn
 import numpy as np
 import mysql.connector
 import face_recognition
+import socket
 
 from PyQt5.QtCore import QThread, pyqtSignal
 from huggingface_hub import hf_hub_download
@@ -64,10 +65,43 @@ class TCP():
                 self.message = "53\n"
             case "side_parking":
                 self.message = "88\n"
+            case "no_drive_way":
+                self.message = "77\n"
             case "emergency":
                 self.message = "99\n"
         
         return self.message
+
+class SeverSocket(QThread):
+    update = pyqtSignal(str)
+    def __init__(self, sec=0, parent=None):
+        super().__init__()
+        self.HOST = '0.0.0.0'
+        self.PORT = 12345 
+
+        self.main = parent
+        self.isRunning = True
+        self.clikent_socket = None
+
+    def run(self):
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind((self.HOST, self.PORT))
+        self.server_socket.listen(2)
+
+        while self.isRunning:
+            try:
+                self.client_socket, _ = self.server_socket.accept()
+
+            # 클라이언트로부터 데이터 수신
+                data = self.client_socket.recv(1024).decode('utf-8')
+                self.update.emit(data)
+            
+            except:
+                # 클라이언트 연결 종료
+                self.client_socket.close()
+
+    def stop(self):
+        self.isRunning = False
 
 class DataBase():
     def __init__(self):
