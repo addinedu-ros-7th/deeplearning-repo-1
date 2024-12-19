@@ -42,7 +42,7 @@ class CASS_BOT(nn.Module):
 
         self.user_input = ""
         self.stt_order_list = []
-        self.engine = False  # 시동 on, off 유무
+        self.engine = False 
 
 
     def get_session_token(self):
@@ -103,14 +103,12 @@ class CASS_BOT(nn.Module):
                         input=True,
                         frames_per_buffer=1024)
 
-        #print("음성 인식 중...종료시 's' 키 다시 클릭")
         self.audio_frames = []
 
         while self.recording:
             data = stream.read(1024, exception_on_overflow=False)
             self.audio_frames.append(data)
 
-        #print("음성 인식 완료")
         stream.stop_stream()
         stream.close()
         p.terminate()
@@ -126,8 +124,6 @@ class CASS_BOT(nn.Module):
                 else:
                     self.recording = False
                     print("음성 인식 완료")
-                    # print('this is self.audio_frames : ', self.audio_frames)
-
                     if self.audio_frames:
                         # Session Token 획득
                         res = self.get_session_token()
@@ -209,7 +205,6 @@ class CASS_BOT(nn.Module):
         # 정차 하기
         elif '정차' in result or '정지' in result or '멈추' in result:
             if 'on' in self.stt_order_list:  # 시동 켜져 있을 때
-                # self.stt_order = 'stop'
                 if 'go' in self.stt_order_list:
                     self.stt_order = 'stop'
                     go_idx = self.stt_order_list.index('go')
