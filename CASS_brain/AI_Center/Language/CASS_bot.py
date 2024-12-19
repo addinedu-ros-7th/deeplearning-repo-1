@@ -11,6 +11,7 @@ import torch.nn as nn
 from gtts import gTTS
 from playsound import playsound
 import tempfile  # 임시 파일 생성
+import socket
 
 # stt 를 위한 모듈
 import base64
@@ -41,11 +42,14 @@ class CASS_BOT(nn.Module):
         self.stt_order_list = []
         self.engine = False  # 시동 on, off 유무
 
+        self.tcp_host = '192.168.0.59'
+        self.tcp_port = 12345
+
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def get_session_token(self):
         headers = {'Authorization': f'Bearer {self.API_TOKEN}'}
         return requests.get(self.HOST + "/stt/v1/stream/sessionTokens", headers=headers).json()
-
 
     def send_audio_stream(self, audio_stream: bytes, sid: str, s_token: str):
         headers = {'Authorization': f'Bearer {s_token}', 'Content-Type': 'application/json'}
@@ -63,7 +67,6 @@ class CASS_BOT(nn.Module):
             print(f"Error sending audio: {e}")
 
         requests.post(self.HOST + "/stt/v1/stream/recognize", headers=headers, json=data)
-
 
     def get_audio_stream(self, sid: str, s_token: str):
         headers = {'Authorization': f'Bearer {s_token}'}
@@ -105,7 +108,6 @@ class CASS_BOT(nn.Module):
         stream.close()
         p.terminate()
 
-
     def handle_key(self, key):
         try:
             if key.char == 's': 
@@ -141,11 +143,17 @@ class CASS_BOT(nn.Module):
         except AttributeError:
             pass
 
-
     def first_result(self, input):
         chain = RemoteRunnable("https://notable-daily-sunbeam.ngrok-free.app/chat/")
         output = chain.invoke({"messages": [{"role": "user", "content": input}]})
         return output
+    
+    def tcp_connection(self, message):
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((self.tcp_host, self.tcp_port))
+        msg = 'Bot : ' + message
+        client_socket.send(msg.encode('utf-8'))
+        client_socket.close()
 
     def check_result(self, output):
         self.flag = None  
@@ -211,9 +219,8 @@ class CASS_BOT(nn.Module):
             pass
 
         if self.stt_order != None:
-            print('order ---------------------> ', self.stt_order)
+            self.tcp_connection(self.stt_order)
             return self.stt_order
-
 
     def cass_output(self, input):
         if '현재 시간' in input or '지금 시간' in input:
@@ -252,7 +259,6 @@ class CASS_BOT(nn.Module):
                 else:
                     output = input
         return output
-
 
     def text_to_speech(self, text):
         tts = gTTS(text=text, lang='ko', slow=False)
