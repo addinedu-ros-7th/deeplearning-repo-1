@@ -7,11 +7,13 @@
 from langserve import RemoteRunnable
 import torch.nn as nn
 
+import time
+import asyncio
+
 # tts 를 위한 모듈
 from gtts import gTTS
 from playsound import playsound
 import tempfile  # 임시 파일 생성
-import socket
 
 # stt 를 위한 모듈
 import base64
@@ -42,12 +44,11 @@ class CASS_BOT(nn.Module):
         self.stt_order_list = []
         self.engine = False  # 시동 on, off 유무
 
-        self.tcp_host = '192.168.0.59'
-        self.tcp_port = 12345
 
     def get_session_token(self):
         headers = {'Authorization': f'Bearer {self.API_TOKEN}'}
         return requests.get(self.HOST + "/stt/v1/stream/sessionTokens", headers=headers).json()
+
 
     def send_audio_stream(self, audio_stream: bytes, sid: str, s_token: str):
         headers = {'Authorization': f'Bearer {s_token}', 'Content-Type': 'application/json'}
@@ -66,6 +67,7 @@ class CASS_BOT(nn.Module):
 
         requests.post(self.HOST + "/stt/v1/stream/recognize", headers=headers, json=data)
 
+
     def get_audio_stream(self, sid: str, s_token: str):
         headers = {'Authorization': f'Bearer {s_token}'}
         with EventSource(self.HOST + f"/stt/v1/stream/sse/{sid}", timeout=30, headers=headers) as event_source:
@@ -77,6 +79,7 @@ class CASS_BOT(nn.Module):
                         result = re.sub(r'카스|갔을|갔어|가스', 'CASS', result)
                         result = result.replace('시동 거', '시동 꺼')
                         result = result.replace('스탑', '스톱')
+                        print('result 는', result)
                         return result
                     else:
                         message = '다시 말씀해 주세요'
@@ -112,6 +115,7 @@ class CASS_BOT(nn.Module):
         stream.close()
         p.terminate()
 
+
     def handle_key(self, key):
         try:
             if key.char == 's': 
@@ -122,6 +126,7 @@ class CASS_BOT(nn.Module):
                 else:
                     self.recording = False
                     print("음성 인식 완료")
+                    # print('this is self.audio_frames : ', self.audio_frames)
 
                     if self.audio_frames:
                         # Session Token 획득
@@ -140,6 +145,8 @@ class CASS_BOT(nn.Module):
 
                         # 전송 후 초기화
                         self.audio_frames = []
+
+                        asyncio.run(self.handle_user_input())
                         return False
             elif key.char == 'q':  # Quit
                 print("Exiting program...")
@@ -147,17 +154,11 @@ class CASS_BOT(nn.Module):
         except AttributeError:
             pass
 
+
     def first_result(self, input):
         chain = RemoteRunnable("https://notable-daily-sunbeam.ngrok-free.app/chat/")
         output = chain.invoke({"messages": [{"role": "user", "content": input}]})
         return output
-    
-    def tcp_connection(self, message):
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((self.tcp_host, self.tcp_port))
-        msg = 'Bot : ' + message
-        client_socket.send(msg.encode('utf-8'))
-        client_socket.close()
 
     def check_result(self, output):
         self.flag = None  
@@ -224,8 +225,8 @@ class CASS_BOT(nn.Module):
 
         if self.stt_order != None:
             print('order ---------------------> ', self.stt_order)
-            self.tcp_connection(self.stt_order)
             return self.stt_order
+
 
     def cass_output(self, input):
         if '현재 시간' in input or '지금 시간' in input:
@@ -265,6 +266,7 @@ class CASS_BOT(nn.Module):
                     output = input
         return output
 
+
     def text_to_speech(self, text):
         tts = gTTS(text=text, lang='ko', slow=False)
         # 임시 파일 생성
@@ -273,28 +275,46 @@ class CASS_BOT(nn.Module):
             playsound(temp_file.name)  # 음성 재생
             self.user_input = ""
 
+    async def handle_user_input(self):
+        if self.user_input:
+            print('CASS_bot activated!')
+            print('user_input : ', self.user_input)
+            response = self.first_result(self.user_input)
+            self.check_result(response)
+            final_output = self.cass_output(response)
+            self.text_to_speech(final_output)
+            print("CASS 응답:", final_output)
+            print('=' * 50)
+
+    def run_listener(self):
+        with keyboard.Listener(on_press=self.handle_key) as listener:
+            listener.join()
+
+    async def run_async(self):
+        while True:
+            self.run_listener()
+            await asyncio.sleep(1)
+
+    def run(self):
+        # asyncio 이벤트 루프를 별도의 스레드에서 실행
+        loop_thread = threading.Thread(target=self.start_event_loop)
+        loop_thread.daemon = True  # 프로그램 종료 시 자동 종료
+        loop_thread.start()
+
+    def start_event_loop(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self.run_async())
+
 
 if __name__ == "__main__":
     # 모든 경고 무시
     warnings.filterwarnings("ignore")   
 
-    print("'s' 키를 눌러 음성 명령, 다시 's' 키를 눌러 명령 종료")
-    print("시스템 종료는 'q' 키를 누르세요.")
-    print("=" * 50)
-
+    # CASS_bot 실행
     cass_bot = CASS_BOT()
+    cass_bot.run()
 
     while True:
-        with keyboard.Listener(on_press=cass_bot.handle_key) as listener:
-            listener.join()
-            if cass_bot.user_input:
-                print('CASS_bot activated!')
-                print('user_input : ', cass_bot.user_input)
-                response = cass_bot.first_result(cass_bot.user_input)
-                order = cass_bot.check_result(response)
-                final_output = cass_bot.cass_output(response)
-                cass_bot.text_to_speech(final_output)
-                print("CASS 응답:", final_output)
-                print('=' * 50)
-            else:
-                break
+        print('이건 다른 스레드....')
+        time.sleep(1)
