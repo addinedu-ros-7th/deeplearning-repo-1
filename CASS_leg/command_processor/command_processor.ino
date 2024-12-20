@@ -46,7 +46,8 @@ unsigned long LED_Flash_start_time = 0;
 
 
 // BLUE LED 변수
-bool BLUE_ON = false;
+bool authentified_BLUE_ON = false;
+bool POWER_BLUE_ON = false;
 
 // 탑승자 무반응 비상상황 대응변수
 bool Emergency_Signal = false;
@@ -69,7 +70,7 @@ bool SearchForLines = false;
 bool isRight = false;
 
 
-WiFiServer server(500);
+WiFiServer server(600);
 
 // BLUE LED 동작 함수
 void LED_startTimer()
@@ -100,29 +101,28 @@ void LED_FlashTimer()
 bool LED_FLASH()
 {
   unsigned long now = millis();
+
   if (LED_Flash_start_time == 0)
   {
     return false;
   }
-  else if((now - LED_Flash_start_time) <= 1000)
+  else if((now - LED_Flash_start_time) <= LED_DELAY_TIME)
   {
-    return true;
-  }
-  else if((now - LED_Flash_start_time) <= 2000)
-  {
-    return false;
-  }
-  else if((now - LED_Flash_start_time) <= 3000)
-  {
-    return true;
-  }
-  else if ((now - LED_Flash_start_time) <= 4000)
-  {
-    return false;
-  }
-  else if ((now - LED_Flash_start_time) <= LED_DELAY_TIME)
-  {
-    return true;
+    if ((now - LED_Flash_start_time) <= 1000)
+    {
+ 
+      return true;
+    }
+    else if ((now - LED_Flash_start_time) > 2000 && (now - LED_Flash_start_time) <= 3000)
+    {
+      // Serial.println("2");
+      return true;
+    }
+    else if ((now - LED_Flash_start_time) > 4000 && (now - LED_Flash_start_time) <= 5000)
+    {
+      // Serial.println("3");
+      return true;
+    }
   }
   return false;
 }
@@ -311,10 +311,11 @@ void loop() {
       
       case 21: // 차주 인식 + 시동 ON 가능 + 동작 불가능
         client.print("welcome soyoung\n");
+        Serial.println("21. 차주 인식 완료");
         select_num = 0;
         authentified = true;
         isStop = true;
-        BLUE_ON = true;
+        authentified_BLUE_ON = true;
         LED_startTimer(); 
         break;
 
@@ -322,25 +323,30 @@ void loop() {
         if (authentified)
         {
           client.print("Driving Available\n");
+          Serial.println("22. 시동 ON");
           select_num = 0;
           isPowerOn = true; // authentified가 true이어야만 isPowerOn이 true가 됨.
-          BLUE_ON = true;
+          POWER_BLUE_ON = true;
           LED_FlashTimer();
         }
+        break;
       
       case 23: // 운행 종료
         if (isStop)
         {
           client.print("Have a nice day.\n");
+          Serial.println("23. 시동 OFF");
           select_num = 0;
           isPowerOn = false;
+          authentified = false;
           // isStop = true;
-          BLUE_ON = true;
+          authentified_BLUE_ON = true;
           LED_startTimer();
         }
         else
         {
           client.print("Stop your car, Please.");
+          Serial.println("정차해야합니다.");
         }
         break;
 
@@ -425,33 +431,36 @@ void loop() {
     }
 
     prev_steer_status = curr_steer_status;
+      // Serial.print("authentified_BLUE_ON: ");
+      // Serial.println(authentified_BLUE_ON);
+      // Serial.print("LED_CheckTimer: ");
+      // Serial.println(LED_checkTimer());
+      // Serial.print("authentified: ");
+      // Serial.println(authentified);
+      // Serial.print("POWER_BLUE_ON: ");
+      // Serial.println(POWER_BLUE_ON);
+      // Serial.print("isPowerOn: ");
+      // Serial.println(isPowerOn);
+      // Serial.print("LED_FLASH: ");
+      // Serial.println(LED_FLASH());
+      // Serial.println("=======================");
+
 
     // 사용자 인증완료 or 시동 OFF 시 LED 작동함수
-    if (BLUE_ON && LED_checkTimer())
+    if (authentified_BLUE_ON && LED_checkTimer() && authentified)
     {
       digitalWrite(BLUE1, HIGH);
     }
-    else
-    {
-      BLUE_ON = false;
-      digitalWrite(BLUE1, LOW);
-    }
-
     // 시동 ON 시 LED 작동 함수
-    if (BLUE_ON && LED_FLASH())
+    else if (POWER_BLUE_ON && LED_FLASH() && authentified && isPowerOn)
     {
       digitalWrite(BLUE1, HIGH);
     }
     else
     {
-      BLUE_ON = false;
+      POWER_BLUE_ON = false;
       digitalWrite(BLUE1, LOW);
     }
-
-    // Serial.print("select_num: ");
-    // Serial.println(select_num);
-    // Serial.print("steering_mode: ");
-    // Serial.println(steering_mode);
     
     if (authentified && isPowerOn) // 차량 구동은 인증이 되고, 시동이 걸려야만 가능
     {
@@ -479,15 +488,15 @@ void loop() {
           break;
         
         case 5: // R1
-          diff = {60, -20};
+          diff = {60, -10};
           break;
 
         case 6: // R2
-          diff = {85, -20};
+          diff = {85, -10};
           break;
 
         case 7: // R3
-          diff = {115, -20};
+          diff = {115, -10};
           break;
 
         case 8: // ACCEL
