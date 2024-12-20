@@ -74,7 +74,7 @@ class LaneSegmentation(nn.Module):
             
             elif point_x < cnst or point_x > img_size[1] - cnst:
                 continue
-            cv2.circle(frame, (point_x.astype(int), point_y.astype(int)), 5, (0, 255, 255), 5)
+            #cv2.circle(frame, (point_x.astype(int), point_y.astype(int)), 5, (0, 255, 255), 5)
             slope = -(start_point[0] - point_x)/(start_point[1] - point_y)
             slope = round(np.rad2deg(np.arctan(slope)))
             point = np.array([point_x, point_y, slope], dtype=np.int32)

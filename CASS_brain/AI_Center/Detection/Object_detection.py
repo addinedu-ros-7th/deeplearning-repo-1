@@ -101,18 +101,18 @@ class ObjectDetection(nn.Module):
                     order = "stop"
                     cls_name = name          
         elif (name == 'person'):
-            if distance < 12:
+            if distance < 17:
                 order = "stop"
                 cls_name = name
                 result_boxes = boxes
         elif (name == 'obstacle'):
-            if distance < 25:
+            if distance < 30:
                 order = "drive"
                 obst_pos = boxes
                 cls_name = name
                 result_boxes = boxes
         elif (name == 'goat'):
-            if distance < 12:
+            if distance < 17:
                 order = "stop"
                 cls_name = name
                 result_boxes = boxes

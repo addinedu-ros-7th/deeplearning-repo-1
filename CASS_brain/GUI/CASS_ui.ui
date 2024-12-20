@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1109</width>
-    <height>694</height>
+    <height>829</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -22,7 +22,7 @@
     <property name="geometry">
      <rect>
       <x>980</x>
-      <y>330</y>
+      <y>370</y>
       <width>41</width>
       <height>41</height>
      </rect>
@@ -133,7 +133,7 @@
     <property name="geometry">
      <rect>
       <x>1020</x>
-      <y>370</y>
+      <y>410</y>
       <width>41</width>
       <height>41</height>
      </rect>
@@ -244,7 +244,7 @@
     <property name="geometry">
      <rect>
       <x>1060</x>
-      <y>330</y>
+      <y>370</y>
       <width>41</width>
       <height>41</height>
      </rect>
@@ -355,7 +355,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>20</y>
+      <y>120</y>
       <width>960</width>
       <height>640</height>
      </rect>
@@ -1277,7 +1277,7 @@
     <property name="geometry">
      <rect>
       <x>1020</x>
-      <y>330</y>
+      <y>370</y>
       <width>41</width>
       <height>41</height>
      </rect>
@@ -2197,7 +2197,7 @@ p, li { white-space: pre-wrap; }
     <property name="geometry">
      <rect>
       <x>1010</x>
-      <y>40</y>
+      <y>140</y>
       <width>61</width>
       <height>61</height>
      </rect>
@@ -2300,37 +2300,11 @@ p, li { white-space: pre-wrap; }
      <string>Power</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="btnConnect">
-    <property name="geometry">
-     <rect>
-      <x>1000</x>
-      <y>150</y>
-      <width>81</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>connect</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="btnCamOn">
-    <property name="geometry">
-     <rect>
-      <x>1000</x>
-      <y>180</y>
-      <width>81</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>cam on</string>
-    </property>
-   </widget>
    <widget class="QPushButton" name="btnTest">
     <property name="geometry">
      <rect>
       <x>1000</x>
-      <y>210</y>
+      <y>250</y>
       <width>81</width>
       <height>21</height>
      </rect>
@@ -2343,7 +2317,7 @@ p, li { white-space: pre-wrap; }
     <property name="geometry">
      <rect>
       <x>1000</x>
-      <y>120</y>
+      <y>220</y>
       <width>81</width>
       <height>21</height>
      </rect>
@@ -2356,7 +2330,7 @@ p, li { white-space: pre-wrap; }
     <property name="geometry">
      <rect>
       <x>1000</x>
-      <y>240</y>
+      <y>280</y>
       <width>81</width>
       <height>21</height>
      </rect>
@@ -2369,7 +2343,7 @@ p, li { white-space: pre-wrap; }
     <property name="geometry">
      <rect>
       <x>990</x>
-      <y>460</y>
+      <y>470</y>
       <width>101</width>
       <height>31</height>
      </rect>
@@ -2378,27 +2352,11 @@ p, li { white-space: pre-wrap; }
      <string>State</string>
     </property>
    </widget>
-   <widget class="QLabel" name="labelRoadSelect">
-    <property name="geometry">
-     <rect>
-      <x>1000</x>
-      <y>430</y>
-      <width>91</width>
-      <height>31</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>road_select</string>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-    </property>
-   </widget>
    <widget class="QLabel" name="labelRec">
     <property name="geometry">
      <rect>
-      <x>20</x>
-      <y>30</y>
+      <x>40</x>
+      <y>140</y>
       <width>71</width>
       <height>18</height>
      </rect>
@@ -8536,7 +8494,7 @@ p, li { white-space: pre-wrap; }
     <property name="geometry">
      <rect>
       <x>1020</x>
-      <y>290</y>
+      <y>330</y>
       <width>41</width>
       <height>41</height>
      </rect>
@@ -9589,7 +9547,7 @@ p, li { white-space: pre-wrap; }
      <bool>false</bool>
     </property>
    </widget>
-   <widget class="QLineEdit" name="lineEdit">
+   <widget class="QLineEdit" name="lineEdit_2">
     <property name="geometry">
      <rect>
       <x>1022</x>
@@ -9598,89 +9556,18 @@ p, li { white-space: pre-wrap; }
       <height>26</height>
      </rect>
     </property>
-    <property name="inputMask">
-     <string/>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="lineEdit_2">
-    <property name="geometry">
-     <rect>
-      <x>1022</x>
-      <y>540</y>
-      <width>71</width>
-      <height>26</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label">
-    <property name="geometry">
-     <rect>
-      <x>980</x>
-      <y>590</y>
-      <width>31</width>
-      <height>18</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>th</string>
-    </property>
    </widget>
    <widget class="QLabel" name="label_2">
     <property name="geometry">
      <rect>
       <x>980</x>
-      <y>540</y>
+      <y>580</y>
       <width>41</width>
       <height>18</height>
      </rect>
     </property>
     <property name="text">
-     <string>gear</string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="lineEdit_3">
-    <property name="geometry">
-     <rect>
-      <x>1022</x>
-      <y>610</y>
-      <width>71</width>
-      <height>26</height>
-     </rect>
-    </property>
-    <property name="inputMask">
-     <string/>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_3">
-    <property name="geometry">
-     <rect>
-      <x>980</x>
-      <y>620</y>
-      <width>31</width>
-      <height>18</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>th_2</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="labelReceive">
-    <property name="geometry">
-     <rect>
-      <x>990</x>
-      <y>500</y>
-      <width>101</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>receiving</string>
+     <string>msg</string>
     </property>
    </widget>
    <widget class="QLabel" name="labelThread">
@@ -10174,6 +10061,19 @@ border-radius:20px;</string>
      <bool>true</bool>
     </property>
    </widget>
+   <widget class="QLabel" name="labelState2">
+    <property name="geometry">
+     <rect>
+      <x>990</x>
+      <y>500</y>
+      <width>101</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>State</string>
+    </property>
+   </widget>
    <zorder>labelLegCam</zorder>
    <zorder>btnLeft</zorder>
    <zorder>btnBackward</zorder>
@@ -10182,13 +10082,10 @@ border-radius:20px;</string>
    <zorder>btnStop</zorder>
    <zorder>TextEDirection</zorder>
    <zorder>btnPower</zorder>
-   <zorder>btnConnect</zorder>
-   <zorder>btnCamOn</zorder>
    <zorder>btnTest</zorder>
    <zorder>btnRegister</zorder>
    <zorder>btnRec</zorder>
    <zorder>labelState</zorder>
-   <zorder>labelRoadSelect</zorder>
    <zorder>labelRec</zorder>
    <zorder>labelStaticObstacleOFF</zorder>
    <zorder>labelStaticObstacleON</zorder>
@@ -10206,15 +10103,11 @@ border-radius:20px;</string>
    <zorder>labelTrafficLightG</zorder>
    <zorder>labelDirectionBack</zorder>
    <zorder>labelDirectionStraight</zorder>
-   <zorder>lineEdit</zorder>
    <zorder>lineEdit_2</zorder>
-   <zorder>label</zorder>
    <zorder>label_2</zorder>
-   <zorder>lineEdit_3</zorder>
-   <zorder>label_3</zorder>
-   <zorder>labelReceive</zorder>
    <zorder>labelThread</zorder>
    <zorder>labelSelectRoadSidepark</zorder>
+   <zorder>labelState2</zorder>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">

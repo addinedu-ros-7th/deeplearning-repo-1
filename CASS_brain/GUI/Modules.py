@@ -72,21 +72,22 @@ class TCP():
         
         return self.message
 
-class SeverSocket(QThread):
+class ServerSocket(QThread):
     update = pyqtSignal(str)
     def __init__(self, sec=0, parent=None):
         super().__init__()
         self.HOST = '0.0.0.0'
-        self.PORT = 12345 
+        self.PORT = 9876 
 
         self.main = parent
         self.isRunning = True
         self.clikent_socket = None
 
-    def run(self):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind((self.HOST, self.PORT))
         self.server_socket.listen(2)
+        
+    def run(self):
 
         while self.isRunning:
             try:
