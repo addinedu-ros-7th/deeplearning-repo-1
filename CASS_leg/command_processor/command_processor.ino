@@ -14,15 +14,14 @@ const int motor_R_reverse = 19;  // 오른쪽 역박향 IN2
 const int motor_L_forward = 26;  // 왼쪽 정방향 IN3
 const int motor_L_reverse = 27;  // 왼쪽 역박향 IN4
 
-
 // 정지 및 직후진, L1~3, R1~3 모드 저장용 변수
 int select_num;
 int steering_mode;
 
 // 차량 기본 속도 세팅
 const int speed = 100;
-const int basic_left_speed = speed + 40;
-const int basic_right_speed = speed;
+const int basic_left_speed = speed + 40; // 140
+const int basic_right_speed = speed + 20; // 120
 
 // 현재 좌우측륜 속력 저장용 변수
 int curr_right_speed;
@@ -33,27 +32,32 @@ struct Delta{
   int l_delta;
   int r_delta;
 };
-Delta d = {0, 0}; // 기본 가감속
+Delta diff = {0, 0}; // 기본 가감속
 Delta brake = {0, 0}; // Siren 전용 감속 변수
 
 // 싸이렌 응급상황 대응변수
-bool Siren = false;
+bool isSiren = false;
 bool prev_siren = true;
 
 // LED millis() 세팅
 unsigned long LED_start_time = 0;
 const unsigned long LED_DELAY_TIME = 5000;
+unsigned long LED_Flash_start_time = 0;
+
 
 // BLUE LED 변수
-bool BLUE_ON = false;
+bool authentified_BLUE_ON = false;
+bool POWER_BLUE_ON = false;
 
 // 탑승자 무반응 비상상황 대응변수
 bool Emergency_Signal = false;
 int Emergency_cnt = 0;
 
-// 주행상황 플래그 변수 (정지 및 직후진)
-bool StopFlag = true;
-bool BackFlag = false;
+// 주행상황 플래그 변수 (시동 ON/OFF 정지 및 직후진)
+bool authentified = false;
+bool isPowerOn = false;
+bool isStop = true;
+bool isBack = false;
 bool isReady = false;
 
 // 속도 출력용 변수
@@ -66,7 +70,7 @@ bool SearchForLines = false;
 bool isRight = false;
 
 
-WiFiServer server(500);
+WiFiServer server(600);
 
 // BLUE LED 동작 함수
 void LED_startTimer()
@@ -85,15 +89,49 @@ bool LED_checkTimer()
   {
     return true;
   }
-  
+  return false;
+}
+
+// BLUE LED 점멸 함수
+void LED_FlashTimer()
+{
+  LED_Flash_start_time = millis();
+}
+
+bool LED_FLASH()
+{
+  unsigned long now = millis();
+
+  if (LED_Flash_start_time == 0)
+  {
+    return false;
+  }
+  else if((now - LED_Flash_start_time) <= LED_DELAY_TIME)
+  {
+    if ((now - LED_Flash_start_time) <= 1000)
+    {
+ 
+      return true;
+    }
+    else if ((now - LED_Flash_start_time) > 2000 && (now - LED_Flash_start_time) <= 3000)
+    {
+      // Serial.println("2");
+      return true;
+    }
+    else if ((now - LED_Flash_start_time) > 4000 && (now - LED_Flash_start_time) <= 5000)
+    {
+      // Serial.println("3");
+      return true;
+    }
+  }
   return false;
 }
 
 // 직진
 void GO_FORWARD()
 {
-  curr_left_speed = basic_left_speed + d.l_delta - brake.l_delta;
-  curr_right_speed = basic_right_speed + d.r_delta - brake.r_delta;
+  curr_left_speed = basic_left_speed + diff.l_delta - brake.l_delta;
+  curr_right_speed = basic_right_speed + diff.r_delta - brake.r_delta;
 
   analogWrite(motor_L_forward, curr_left_speed);
   analogWrite(motor_L_reverse, 0);
@@ -106,8 +144,8 @@ void GO_FORWARD()
 // 후진
 void GO_BACK()
 {
-  curr_left_speed = basic_left_speed + d.l_delta-brake.l_delta;
-  curr_right_speed = basic_right_speed + d.r_delta-brake.r_delta;
+  curr_left_speed = basic_left_speed + diff.l_delta-brake.l_delta;
+  curr_right_speed = basic_right_speed + diff.r_delta-brake.r_delta;
   
   analogWrite(motor_R_forward, 0);
   analogWrite(motor_R_reverse, curr_right_speed);
@@ -119,8 +157,8 @@ void GO_BACK()
 // 정지
 void STOP()
 {
-  curr_left_speed = basic_left_speed + d.l_delta;
-  curr_right_speed = basic_right_speed + d.r_delta;
+  curr_left_speed = basic_left_speed + diff.l_delta;
+  curr_right_speed = basic_right_speed + diff.r_delta;
 
   analogWrite(motor_R_forward, curr_right_speed);
   analogWrite(motor_R_reverse, curr_right_speed);
@@ -132,8 +170,8 @@ void STOP()
 // 차선 탐색용 지그재그 주행
 void ZIGZAG(bool isRight)
 {
-  curr_left_speed = basic_left_speed + d.l_delta;
-  curr_right_speed = basic_right_speed + d.r_delta;
+  curr_left_speed = basic_left_speed + diff.l_delta;
+  curr_right_speed = basic_right_speed + diff.r_delta;
 
   if (isRight)
   {
@@ -158,39 +196,39 @@ void Emergency()
 {
   if (Emergency_cnt < 10)
   {
-    d = {-basic_left_speed, -basic_right_speed};
+    diff = {-basic_left_speed, -basic_right_speed};
     STOP();
   }
   else if (Emergency_cnt < 20)
   {
-    d = {110, 150};
+    diff = {110, 130};
     GO_FORWARD();
   }
   else if (Emergency_cnt < 30)
   {
-    d = {-basic_left_speed, -basic_right_speed};
+    diff = {-basic_left_speed, -basic_right_speed};
     STOP();
   }
   else if (Emergency_cnt < 40)
   {
-    d = {110, 150};
+    diff = {110, 130};
     GO_FORWARD();
   }
   else if (Emergency_cnt < 50)
   {
-    d = {-basic_left_speed, -basic_right_speed};
+    diff = {-basic_left_speed, -basic_right_speed};
     STOP();
   }
   else if (Emergency_cnt < 60)
   {
-    d = {110, 150};
+    diff = {110, 130};
     GO_FORWARD();
   }
   else if (Emergency_cnt < 75)
   {
-    d = {-basic_left_speed, -basic_right_speed};
+    diff = {-basic_left_speed, -basic_right_speed};
     STOP();
-    StopFlag = true;
+    isStop = true;
   }
 
   Emergency_cnt ++;
@@ -249,6 +287,8 @@ void setup() {
 
   server.begin();  // 웹 서버 시작
   int data;
+  authentified = false;
+  isPowerOn = false;
 }
 
 void loop() {
@@ -269,30 +309,50 @@ void loop() {
         Serial.println("클라이언트 연결 성공\n");
         break;
       
-      case 21: // 차주 인식 + 동작 가능
+      case 21: // 차주 인식 + 시동 ON 가능 + 동작 불가능
         client.print("welcome soyoung\n");
+        Serial.println("21. 차주 인식 완료");
         select_num = 0;
-        isReady = true;
-        StopFlag = true;
-        BLUE_ON = true;
+        authentified = true;
+        isStop = true;
+        authentified_BLUE_ON = true;
         LED_startTimer(); 
         break;
 
-      case 22: // 운행 종료
-        if (StopFlag)
+      case 22: // 시동 OFF 가능 + 동작 가능
+        if (authentified)
+        {
+          client.print("Driving Available\n");
+          Serial.println("22. 시동 ON");
+          select_num = 0;
+          isPowerOn = true; // authentified가 true이어야만 isPowerOn이 true가 됨.
+          POWER_BLUE_ON = true;
+          LED_FlashTimer();
+        }
+        break;
+      
+      case 23: // 운행 종료
+        if (isStop)
         {
           client.print("Have a nice day.\n");
+          Serial.println("23. 시동 OFF");
           select_num = 0;
-          isReady = false;
-          // StopFlag = true;
-          BLUE_ON = true;
+          isPowerOn = false;
+          authentified = false;
+          // isStop = true;
+          authentified_BLUE_ON = true;
           LED_startTimer();
+        }
+        else
+        {
+          client.print("Stop your car, Please.");
+          Serial.println("정차해야합니다.");
         }
         break;
 
       case 31: // 직진
-        BackFlag = false;
-        StopFlag = false;
+        isBack = false;
+        isStop = false;
         SearchForLines = false;
         select_num = 1;
         break;
@@ -300,136 +360,151 @@ void loop() {
       case 32: // 정지
         select_num = 0;
         SearchForLines = false;
-        BackFlag = false;
-        StopFlag = true;
+        isBack = false;
+        isStop = true;
         break;
 
       case 33: // 후진
-        BackFlag = true;
+        isBack = true;
         select_num = 1;
-        StopFlag = false;
+        isStop = false;
         SearchForLines = false;
         break;
 
       case 34: // 가속
         select_num = 8;
-        StopFlag = false;
+        isStop = false;
         SearchForLines = false;
         break;
       
       case 41: // L1
-        StopFlag = false;
+        isStop = false;
         select_num = 2;
         SearchForLines = false;    
         break;
       
       case 42: // L2
-        StopFlag = false;
+        isStop = false;
         SearchForLines = false;
         select_num = 3;
         break;
 
       case 43: // L3
-        StopFlag = false;
+        isStop = false;
         SearchForLines = false;
         select_num = 4;
         break;
 
       case 51: // R1
-        StopFlag = false;
+        isStop = false;
         SearchForLines = false;
         select_num = 5;
         break;
 
       case 52: // R2
-        StopFlag = false;
+        isStop = false;
         SearchForLines = false;
         select_num = 6;
         break;
       
       case 53: // R3
-        StopFlag = false;
+        isStop = false;
         SearchForLines = false;
         select_num = 7;        
         break;
 
       case 77: // 차선 탐색
-        StopFlag = false;
+        isStop = false;
         select_num = 9;
         break;
 
       case 88: // 응급상황 갓길주차
-        Siren = true;
+        isSiren = true;
         SearchForLines = false;
         break;
 
       case 99: // 졸음 운전 대응
-        StopFlag = false;
+        isStop = false;
         SearchForLines = false;
         Emergency_Signal = true;
         break;
     }
 
     prev_steer_status = curr_steer_status;
+      // Serial.print("authentified_BLUE_ON: ");
+      // Serial.println(authentified_BLUE_ON);
+      // Serial.print("LED_CheckTimer: ");
+      // Serial.println(LED_checkTimer());
+      // Serial.print("authentified: ");
+      // Serial.println(authentified);
+      // Serial.print("POWER_BLUE_ON: ");
+      // Serial.println(POWER_BLUE_ON);
+      // Serial.print("isPowerOn: ");
+      // Serial.println(isPowerOn);
+      // Serial.print("LED_FLASH: ");
+      // Serial.println(LED_FLASH());
+      // Serial.println("=======================");
 
-    //LED 작동함수
-    if (BLUE_ON && LED_checkTimer())
+
+    // 사용자 인증완료 or 시동 OFF 시 LED 작동함수
+    if (authentified_BLUE_ON && LED_checkTimer() && authentified)
+    {
+      digitalWrite(BLUE1, HIGH);
+    }
+    // 시동 ON 시 LED 작동 함수
+    else if (POWER_BLUE_ON && LED_FLASH() && authentified && isPowerOn)
     {
       digitalWrite(BLUE1, HIGH);
     }
     else
     {
-      BLUE_ON = false;
+      POWER_BLUE_ON = false;
       digitalWrite(BLUE1, LOW);
     }
-
-    // Serial.print("select_num: ");
-    // Serial.println(select_num);
-    // Serial.print("steering_mode: ");
-    // Serial.println(steering_mode);
     
-    if (isReady)
+    if (authentified && isPowerOn) // 차량 구동은 인증이 되고, 시동이 걸려야만 가능
     {
       steering_mode = select_num;
-      // 명령별 조향모드 설정 (기본 가감속 구조체 변수 'd' 사용)
+      // 명령별 조향모드 설정 (기본 가감속 구조체 변수 'diff' 사용)
       switch (steering_mode) {
         case 0: // 정지
-          d = {-basic_left_speed, -basic_right_speed};
+          diff = {-basic_left_speed, -basic_right_speed};
+          break;
 
         case 1: // 직진
-          d = {0, 0};
+          diff = {0, 0};
           break;
 
         case 2: // L1
-          d = {-40, 90};
+          diff = {-40, 90};
           break;
 
         case 3: // L2
-          d = {-45, 110};
+          diff = {-45, 110};
           break;
 
         case 4: // L3
-          d = {-50, 155};
+          diff = {-50, 135};
           break;
         
         case 5: // R1
-          d = {60, -20};
+          diff = {60, -10};
           break;
 
         case 6: // R2
-          d = {85, -20};
+          diff = {85, -10};
           break;
 
         case 7: // R3
-          d = {115, -20};
+          diff = {115, -10};
           break;
 
         case 8: // ACCEL
-          d = {40, 40};
+          diff = {40, 40};
           break;
 
         case 9: // 차선 탐색
-          d = {20, 40};
+          diff = {20, 60};
           SearchForLines = true;
           break;
       }
@@ -438,10 +513,10 @@ void loop() {
 
       if (curr_steer_status != 9 && prev_steer_status == 9)
       {
-        BackFlag = false;
+        isBack = false;
       }
 
-      if(Siren && prev_siren) // 응급상황 감속
+      if(isSiren && prev_siren) // 응급상황 감속
       {
         if (steering_mode > 0) // 정지 제외 나머지 모드에서만 작동
         {
@@ -449,7 +524,7 @@ void loop() {
           brake.l_delta+=1;
           brake.r_delta+=1;
           delay(15);
-          if (StopFlag)
+          if (isStop)
           {
             STOP();
           }
@@ -461,7 +536,7 @@ void loop() {
             }
             else
             {
-              if(BackFlag)
+              if(isBack)
               {
                 GO_BACK();
               }
@@ -474,19 +549,21 @@ void loop() {
         }
         if (curr_right_speed <= 0 || curr_left_speed <= 0) // 감속 중에 현재속도 음수될 시 정차
         {
-          d = {-basic_left_speed, -basic_right_speed};
+          diff = {-basic_left_speed, -basic_right_speed};
           brake = {0, 0};
-          StopFlag = true;
-          Siren = false;
+          isStop = true;
+          isSiren = false;
           prev_siren = false;
           STOP();
+          digitalWrite(RED1, HIGH);
+          digitalWrite(RED2, HIGH);
         }
 
       } 
       else // 응급상황 아닐 시 정상주행
       {
         prev_siren = true;
-        if (StopFlag) // 정지 플래그 true - 정지
+        if (isStop) // 정지 플래그 true - 정지
         {
           SearchForLines = false;
           STOP();
@@ -504,7 +581,7 @@ void loop() {
           else
           {
             SearchForLines = false;
-            if (BackFlag) // 후진 플래그 true - 후진
+            if (isBack) // 후진 플래그 true - 후진
             {
               GO_BACK();
             }
