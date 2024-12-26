@@ -171,4 +171,7 @@ cython_debug/
 # Ai Model files
 *.pt
 *.pth
+<<<<<<< HEAD
 
+=======
+>>>>>>> origin/main
