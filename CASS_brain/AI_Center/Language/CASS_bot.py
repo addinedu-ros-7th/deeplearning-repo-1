@@ -6,7 +6,7 @@
 # remote 로 사용시 해당 모듈만 import 해도 됨.
 from langserve import RemoteRunnable
 import torch.nn as nn
-
+import time
 # tts 를 위한 모듈
 from gtts import gTTS
 from playsound import playsound
@@ -43,7 +43,7 @@ class CASS_BOT(nn.Module):
         self.engine = False  # 시동 on, off 유무
 
         self.tcp_host = '192.168.0.59'
-        self.tcp_port = 12345
+        self.tcp_port = 9876
 
     def get_session_token(self):
         headers = {'Authorization': f'Bearer {self.API_TOKEN}'}
@@ -83,7 +83,7 @@ class CASS_BOT(nn.Module):
                         self.text_to_speech(message)
                         print(message)
                         print('=' * 50)
-                        return
+                        # return
             except InvalidStatusCodeError:
                 pass
             except InvalidContentTypeError:
@@ -100,14 +100,12 @@ class CASS_BOT(nn.Module):
                         input=True,
                         frames_per_buffer=1024)
 
-        #print("음성 인식 중...종료시 's' 키 다시 클릭")
         self.audio_frames = []
 
         while self.recording:
             data = stream.read(1024, exception_on_overflow=False)
             self.audio_frames.append(data)
 
-        #print("음성 인식 완료")
         stream.stop_stream()
         stream.close()
         p.terminate()
@@ -152,12 +150,32 @@ class CASS_BOT(nn.Module):
         output = chain.invoke({"messages": [{"role": "user", "content": input}]})
         return output
     
+    def try_to_tcp(self):
+        while True:
+            try:    
+                socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((self.tcp_host, self.tcp_port))
+                self.client_socket_recv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.client_socket_recv.connect((self.tcp_host, self.tcp_port))
+                print('tcp 연결 완료')
+                break
+            except:
+                print('연결 시도 중...')
+                time.sleep(1)
+                continue    
+    
     def tcp_connection(self, message):
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((self.tcp_host, self.tcp_port))
-        msg = 'Bot : ' + message
-        client_socket.send(msg.encode('utf-8'))
-        client_socket.close()
+        try:
+            client_socket_send = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket_send.connect((self.tcp_host, self.tcp_port))
+            
+            msg = 'Bot : ' + message
+            client_socket_send.send(msg.encode('utf-8'))
+    
+            print('order ---------------------> ', message)
+            client_socket_send.close()
+        except Exception as e:
+            print(f"Error from tcp_connection: {e}")
+
 
     def check_result(self, output):
         self.flag = None  
@@ -180,10 +198,11 @@ class CASS_BOT(nn.Module):
         # 시동 끄기
         elif '시동' in result and ('끄' in result or '꺼' in result):
             if 'on' in self.stt_order_list and not 'go' in self.stt_order_list:
+            # if self.stt_order_list == ['on']:
                 self.engine = False
                 self.stt_order = 'off'
-                on_idx = self.stt_order_list.index('on')
-                self.stt_order_list[on_idx] = 'off'
+                # on_idx = self.stt_order_list.index('on')
+                # self.stt_order_list[on_idx] = 'off'
                 self.stt_order_list = [] 
             elif (self.stt_order_list == [] or 'off' in self.stt_order_list) and self.engine == False:
                 self.flag = 1
@@ -222,7 +241,6 @@ class CASS_BOT(nn.Module):
             pass
 
         if self.stt_order != None:
-            print('order ---------------------> ', self.stt_order)
             self.tcp_connection(self.stt_order)
             return self.stt_order
 
@@ -259,7 +277,7 @@ class CASS_BOT(nn.Module):
                     output = '주행 중 입니다. 차량을 정차시킨 후 시동을 꺼주세요.'
             else:
                 if len(input) >= 12 and '네, 여기 있습니다.' in input:
-                    output = input.replace('네, 여기 있습니다.', '')
+                    output = input.replace('sss네, 여기 있습니다.', '')
                 else:
                     output = input
         return output
@@ -272,6 +290,85 @@ class CASS_BOT(nn.Module):
             playsound(temp_file.name)  # 음성 재생
             self.user_input = ""
 
+    def get_car_state(self):
+        while True:
+            try:
+                # client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                # client_socket.connect((self.tcp_host, self.tcp_port))
+                self.response = self.client_socket_recv.recv(1024).decode('utf-8')
+                self.response = self.response.split(' ')[-1]
+                # 마지막 챗봇 명령이랑 현재 하드웨어 상태가 다르면
+                if self.response and self.response != 'off':
+                    if len(self.stt_order_list) > 0: # 현재 값이 하나 이상 있을 때
+                        if self.stt_order_list[-1] != self.response:
+                            if (self.stt_order_list[-1] == 'go' or self.stt_order_list[-1] == 'stop') and (self.response == 'go' or self.response == 'stop'):
+                                self.stt_order_list[-1] = self.response
+                                print(f"self.stt_order_list is updated to {self.stt_order_list}")
+                            else:
+                                self.stt_order_list.append(self.response)
+                                print(f"self.stt_order_list is updated to {self.stt_order_list}")
+                        else:
+                            pass
+                    else:  # 현재 리스트가 비어있을 때
+                        self.stt_order_list.append(self.response)
+                        print(f"'{self.response}' added so self.stt_order_list = {self.stt_order_list}")
+                elif self.response and self.response == 'off':
+                    self.stt_order_list = []
+                    print(f'self.stt_order_list get empty -> {self.stt_order_list}')
+                else:
+                    pass
+
+                if 'on' in self.stt_order_list:
+                    self.engine = True
+                else:
+                    self.engine = False
+
+                # break
+            except Exception as e:
+                print(f"Error from get_car_state: {e}")
+                continue
+
+
+    # def get_car_state(self):
+    #     # 서버 주소와 포트 설정
+    #     SERVER_HOST = '0.0.0.0'  # 서버 IP 주소
+    #     SERVER_PORT = 12342          # 서버 포트 번호
+
+    #     # 소켓 생성
+    #     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    #     # 소켓 옵션 설정: 포트가 이미 사용 중인 경우 재사용 가능하게 설정
+    #     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+    #     # 서버 주소 바인딩
+    #     server_socket.bind((SERVER_HOST, SERVER_PORT))
+
+    #     # 서버가 연결을 기다리도록 설정
+    #     server_socket.listen(5)  # 최대 5개의 클라이언트 대기
+
+    #     print(f"Server is listening on {SERVER_HOST}:{SERVER_PORT}...")
+
+    #     # 클라이언트 연결 수락
+    #     client_socket, client_address = server_socket.accept()
+    #     print(f"Connection from {client_address} has been established.")
+
+    #     # while 1:
+    #     # 클라이언트로부터 메시지 수신
+    #     message = client_socket.recv(1024).decode('utf-8')
+    #     print(f"Received from client: {message}")
+
+    #         # 클라이언트에게 응답 전송
+    #         # response = "Acknowledged: " + message
+    #         # client_socket.send(response.encode('utf-8'))
+
+    #     # 연결 종료
+    #     client_socket.close()
+    #     server_socket.close()
+
+    def start_car_state_thread(self):
+        car_state_thread = threading.Thread(target=self.get_car_state)
+        car_state_thread.daemon = True 
+        car_state_thread.start()
 
 if __name__ == "__main__":
     # 모든 경고 무시
@@ -283,6 +380,12 @@ if __name__ == "__main__":
 
     cass_bot = CASS_BOT()
 
+    # 신호를 받기위한 tcp 연결
+    # cass_bot.try_to_tcp()
+
+    # 하드웨어 상태 가져오기
+    # cass_bot.start_car_state_thread()
+
     while True:
         with keyboard.Listener(on_press=cass_bot.handle_key) as listener:
             listener.join()
@@ -292,8 +395,11 @@ if __name__ == "__main__":
                 response = cass_bot.first_result(cass_bot.user_input)
                 order = cass_bot.check_result(response)
                 final_output = cass_bot.cass_output(response)
-                cass_bot.text_to_speech(final_output)
                 print("CASS 응답:", final_output)
+                cass_bot.text_to_speech(final_output)
                 print('=' * 50)
             else:
-                break
+                # cass_bot.get_car_state()
+                pass
+
+            
