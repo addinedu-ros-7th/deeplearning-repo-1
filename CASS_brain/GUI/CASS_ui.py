@@ -38,7 +38,7 @@ class MainWindow(QMainWindow, form_class):
 
         self.driver = Driver()
         self.db = DataBase()
-        self.db.connectLocal("0050")
+        self.db.connectLocal("****")
         self.TCP = TCP()
 
         self.setAiModels()
@@ -73,9 +73,11 @@ class MainWindow(QMainWindow, form_class):
         try:
             self.reader, self.writer = await asyncio.open_connection(
                 self.esp32_ip, self.esp32_port)
-            self.sendMsg("connect") 
-            print("Connected to ESP32")
-
+            msg = self.TCP.encodeMsg("connect")
+            self.sendMsg(msg)
+            print("Connecting to ESP32")
+        except asyncio.TimeoutError:
+            print(f"Connection timed out!")
         except Exception as e:
             print(f"An error occurred when connecting: {e}")
 
@@ -85,17 +87,16 @@ class MainWindow(QMainWindow, form_class):
             await self.writer.drain()
 
             data = await self.reader.read(100)
-            print(f'Received: {data.decode()}')
 
             if data:
-                self.labelReceive.setText(data.decode())
-            
-            if data == message:
-                self.stopFlag = True
-                print("data received")
-            else:
-                self.stopFlag = False
-                print("data not received")
+                data_split = data.decode('utf-8').split('\n')
+                print(f'Received from ESP32: {data_split}')
+
+                if data_split[1] == "0":
+                    self.isDrive = False
+                    self.isPowerOn = False
+                    self.labelState.setText("Power Off")
+                    self.labelState2.setText("Stop")
 
         except Exception as e:
             pass
@@ -105,28 +106,31 @@ class MainWindow(QMainWindow, form_class):
         if self.writer:
             asyncio.ensure_future(self.async_send_message(message))
         else:
-            print("No writer available")
+            pass
 
     async def close_connection(self):
         self.writer.close()
         await self.writer.wait_closed()
         print("Connection closed")
 
+    def connectLeg(self):
+        """
+        retry to connect with ESP32 by pressing Key_C
+        """
+        asyncio.ensure_future(self.connect_async())
+
     def setAiModels(self):
-        self.authentification_model = FaceRecognitionModel()
-        self.drowsy_model = DrowsyDetection()
         self.detect_model = ObjectDetection('bestDetect.pt')
         self.segment_model = LaneSegmentation('bestSeg.pt')
-        self.emergency_model = EmergencyRecognizer().cuda()
-        self.emergency_model.load_state_dict(torch.load('emergency.pt'))
-        self.emergency_model.RTparameter_setting()
+        self.voice_id_model = VoiceRecognizer(input_size=120, n_classes=6).cuda()
+        self.voice_id_model.load_state_dict(torch.load('Voice_Check.pt'))
 
     # set drive info
     def setDirection(self, direction):
         self.direction = direction
         
     def selectRoad(self, road):
-        self.road = road
+        self.road_selection = road
 
     def driveState(self):
         """
@@ -134,73 +138,134 @@ class MainWindow(QMainWindow, form_class):
         """
         if self.isDrive == False:
             self.isDrive = True
-            self.btnPower.setText("OFF")
+            message = self.TCP.encodeMsg("accel")
+            self.sendMsg(message)
+            self.sendMsg(message)
+            print("drive go, accel on")
+            response = "go"
+            self.labelState2.setText("Go")
         else:
             self.isDrive = False
-            self.btnPower.setText("ON")
-            # self.sendMsg("drive")
+            response = "stop"
+            self.labelState2.setText("Stop")
+            print("drive stop")
+
+        try:
+            self.cassServer.client_socket.send(response.encode('utf-8'))
+        except Exception as e:
+            print(f"{e} client is not connected")
+
+    def voice_order(self, value):
+        if value == "on" and self.state1 == "off":
+            self.power_state = "on"
+            self.isPowerOn = True
+            msg = self.TCP.encodeMsg("power_on")
+            self.sendMsg(msg)
+            self.labelState.setText("Power On")
+
+        elif value == "off" and self.state1 == "on":
+            self.power_state = "off"
+            self.isPowerOn = False
+            msg = self.TCP.encodeMsg("power_off")
+            self.sendMsg(msg)
+            self.labelState.setText("Power Off")
+
+        elif value == "go" and self.state2 == "stop":
+            self.drive_state = "go"
+            self.driveState()
+            self.setDirection("straight")
+            self.labelState2.setText("Go")
+
+        elif value == "stop" and self.state2 == "go":
+            self.drive_state = "stop"
+            self.driveState()
+            self.labelState2.setText("Stop")
 
     def keyPressEvent(self, event):
         """
         control with keyboard
 
-        when auto driving mode (engine_state = ON)
+        when auto driving mode
         W : straight 
         A : left _ steering direction
         D : right - steering direction
-        S : stop - engine_state = OFF
+        S : stop
 
-        when manual driving mode (engine_state = OFF)
+        when manual driving mode
         W : drive 
-        A : left 
-        D : right
+        A : left (L3)
+        D : right (R3)
         S : reverse
 
-        O : change engine state 
+        P : car power ON/OFF
+        O : change drive state
         R : record
-        C : connect to esp32 
-        E : emergency stop
+        C : connect to esp32
+        V : voice authentification
         """
-        if event.key() == Qt.Key_W:
-            if self.isDrive == False:
-                self.sendMsg("drive")
-                print("send drive")
+        if event.key() == Qt.Key_Q:
+            if self.isAutoDrive == True:
+                self.isAutoDrive = False
             else:
+                self.isAutoDrive = True 
+
+        elif event.key() == Qt.Key_W:
+            if self.isAutoDrive == True:
                 self.setDirection("straight")
-                print("direction straight")
+            else:
+                message = self.TCP.encodeMsg("drive")
+                self.sendMsg(message)
 
         elif event.key() == Qt.Key_A:
-            if self.isDrive == False:
-                self.sendMsg("L2")
-            else:
+            if self.isAutoDrive == True:
                 self.setDirection("left")
+            else:
+                message = self.TCP.encodeMsg("L3")
+                self.sendMsg(message)
 
         elif event.key() == Qt.Key_D:
-            if self.isDrive == False:
-                self.sendMsg("R2")
-            else:
+            if self.isAutoDrive == True:
                 self.setDirection("right")
+            else:
+                message = self.TCP.encodeMsg("R3")
+                self.sendMsg(message)
 
         elif event.key() == Qt.Key_S:
-            if self.isDrive == False:
-                self.isDrive = True
+            if self.isAutoDrive == True and self.isDrive == True:
+                self.driveState()
             else:
-                self.sendMsg("reverse")
+                message = self.TCP.encodeMsg("reverse")
+                self.sendMsg(message)
 
-        elif event.key() == Qt.Key_O:
-            self.driveState()
-            
         elif event.key() == Qt.Key_R:
             self.clickRecord()
 
         elif event.key() == Qt.Key_C:
             self.connectLeg()
 
-        elif event.key() == Qt.Key_V:
-            self.legCamOn()
+        elif event.key() == Qt.Key_O:
+            self.driveState()
+            
+        elif event.key() == Qt.Key_P:
+            if self.isPowerOn == True:
+                self.isPowerOn = False
+                self.sendMsg("23\n")
+                response = 'off'
+                self.labelState.setText("Power Off")
+            else:    
+                self.isPowerOn = True
+                self.sendMsg("22\n")
+                response = "on"
+                self.labelState.setText("Power On")
 
-        elif event.key() == Qt.Key_E:
-            self.selectRoad("side_park")
+            try:
+                self.cassServer.client_socket.send(response.encode('utf-8'))
+                print(f"{response} has sent")
+            except Exception as e:
+                print(f"connection lost : {e}")
+
+        elif event.key() == Qt.Key_V:
+            self.voiceAuthentification()
 
     # Setting GUI
     def setBtns(self):
@@ -212,8 +277,6 @@ class MainWindow(QMainWindow, form_class):
         self.btnRight.clicked.connect(lambda: self.setDirection("right"))
         self.btnLeft.clicked.connect(lambda: self.setDirection("left"))
         self.btnStop.clicked.connect(lambda: self.setDirection("stop"))
-
-        self.btnConnect.clicked.connect(self.connectionRetry)
 
     def setIcons(self):
         self.btnForward.setIcon(QIcon("./icons/arrowUp.png"))
@@ -239,6 +302,7 @@ class MainWindow(QMainWindow, form_class):
         self.labelSelectRoad.setPixmap(QPixmap("./icons/selectRoad.png"))
         self.labelSelectRoadLeft.setPixmap(QPixmap("./icons/selectRoadLeft.png"))
         self.labelSelectRoadRight.setPixmap(QPixmap("./icons/selectRoadRight.png"))
+        self.labelSelectRoadSidepark.setPixmap(QPixmap("./icons/selectRoadSidepark.jpg"))
 
     def setLabels(self):
         self.labelRec.hide()
@@ -256,14 +320,23 @@ class MainWindow(QMainWindow, form_class):
 
         self.labelSelectRoadLeft.hide()
         self.labelSelectRoadRight.hide()
+        self.labelSelectRoadSidepark.hide()
 
     def setStates(self):
         self.duration = 0
         self.count = 0
         self.authentified = False
-        self.stopFlag = False
+
+        self.power_state = "off"
+        self.drive_state = "stop"
+        self.isPowerOn = False
         self.isDrive = False
+        self.isReverse = False
         self.isRecording = False
+
+        self.emergency = None
+        self.isEmergency1 = False
+        self.isEmergency2 = False
 
         self.isDrowsy1 = False
         self.isDrowsy2 = False
@@ -276,15 +349,17 @@ class MainWindow(QMainWindow, form_class):
         self.objs_keys = self.UI_objs.keys()
 
         # Lane Segmentation Parameter
+        self.threshold = 40
+        self.count_nd = 0
         self.st = time.time()
         self.et = time.time()
         self.dt = 0
         self.avoid_check = False
-        self.road_select = 'center'
+        self.road_selection = 'center'
         self.direction = "straight"
-        self.road = "center"
         self.order = None
-        self.curFlag = None
+        self.ab_order = None
+        self.prev_order = None
     
     def updateUI(self, objs, direction, select_road):     
         objs = set(objs)
@@ -334,6 +409,10 @@ class MainWindow(QMainWindow, form_class):
             self.labelSelectRoadRight.show()
         else:
             self.labelSelectRoadRight.hide()
+        if 'side_park' == select_road:
+            self.labelSelectRoadSidepark.show()
+        else:
+            self.labelSelectRoadSidepark.hide()
 
     # Camera
     def setCamThreads(self):
@@ -349,6 +428,10 @@ class MainWindow(QMainWindow, form_class):
         self.record = Thread()
         self.record.daemon = True
         self.record.update.connect(self.updateRecording)
+
+        self.cassServer = ServerSocket()
+        self.cassServer.daemon = True
+        self.cassServer.update.connect(self.get_client_data)
     
     def setLabelCams(self):
         self.labelRec.hide()
@@ -357,7 +440,7 @@ class MainWindow(QMainWindow, form_class):
         self.facePixmap = QPixmap(self.width, self.height)
 
         self.w, self.h = self.labelLegCam.width(), self.labelLegCam.height()
-        self.legPixmap = QPixmap(self.w, self.h)
+        self.legPixmap = QPixmap(640, 480) #QPixmap(self.w, self.h)
 
     def cameraOn(self):
         '''
@@ -376,18 +459,8 @@ class MainWindow(QMainWindow, form_class):
             self.legCam.start()
             self.legCam.isRunning = True
             self.legVideo = cv2.VideoCapture(legCamID)
-
-    def legCamOn(self):
-        '''
-        in case not using face_recognition
-        '''
-        self.labelFace.hide()
-        self.legCam.start()
-        self.legCam.isRunning = True
-        self.legVideo = cv2.VideoCapture(legCamID)
-        print("leg camera on")
-
-        self.authentified = True
+            self.cassServer.start()
+            self.cassServer.isRunning = True
 
     # Record
     def clickRecord(self):
@@ -528,45 +601,108 @@ class MainWindow(QMainWindow, form_class):
                     self.authentified = True
                     QMessageBox.warning(self, "Authentification ", 
                     f"{self.name} Driver Authentification Success.")
-                    self.sendMsg(self.name)
-                        
-                    # self.labelFaceCam.hide()
+                    msg = self.TCP.encodeMsg("authentified")
+                    self.sendMsg(msg)
                     self.cameraOn()
 
-    def drowsyDetection(self, frame):
+    def voiceAuthentification(self):
+        if self.authentified == False:
+            QMessageBox.warning(self, "Voice Authentification", "주행자 인증을 위한 3초 음성인식을 시작합니다.")
+            time.sleep(0.4)
+            result = self.voice_id_model.voicecheck()
+            if result == True:
+                self.labelThread.hide()
+                self.authentified = True
+                QMessageBox.information(self, "Voice Authentification", "주행자 인증이 완료되었습니다.")
+                message = self.TCP.encodeMsg(self.name)
+                self.sendMsg(message)
+                self.cameraOn()
+            else:
+                QMessageBox.warning(self, "Voice Authentification", "인증에 실패하였습니다. 다시 인증해주세요.")
+        else:
+            self.labelThread.hide()
+            pass
+
+    def get_client_data(self, data):
+        data = data.split(' : ')
+        if len(data) == 1:
+            # print(len(data))
+            return
+        else:
+            key = data[0]
+            value = data[1]
+            response = "nak"
+
+            if 'Bot' in key:
+                print(f"Received from Bot: {value}")
+                response = f"Server resend to Bot: {value}"
+                self.voice_order(value)
+
+            elif 'Drowsy' in key:
+                print(f"Received from Drowsy: {value}")
+                response = f"Server resend to Drowsy: {value}"
+                self.drowsyDetected(value)
+
+            elif 'Siren' in key:    
+                print(f"Received from Siren: {value}")
+                response = f"Server resend to Siren: {value}"
+                self.updateEmergency(value)
+                self.emergencyLogger()
+
+            self.cassServer.client_socket.send(response.encode('utf-8'))
+
+    def drowsyDetected(self, state):
         """
         if driver is drowsy, turn a camera on 
         if driver is drowsy for (5 secs), control CASS_leg for wake up driver
         """
-        try:
-            predict = self.drowsy_model(frame)
-
-            if predict == 0:
-                if self.duration > 3:
-                    self.labelLegCam.setStyleSheet("border: 5px solid red")
-                    self.isDrowsy1 = True
-                    if self.isRecording == False:
-                        self.clickRecord()
-                        """
-                        TODO: log to DB
-                        """
-                    if self.duration > 5:
-                        self.sendMsg("emergency")
-            else:
-                self.start = time.time()
-                self.labelLegCam.setStyleSheet("")
-                self.isDrowsy1 = False
-                if self.isRecording == True:
-                    self.clickRecord()
-        except:
-            self.start = time.time()
+        if state == "Drowsy":
+            self.isDrowsy1 = True
+        else:
             self.isDrowsy1 = False
-            self.labelFaceCam.setStyleSheet("border: 1px solid white")
+            self.isDrowsy2 = False
+            self.start = time.time()
+            self.labelLegCam.setStyleSheet("")
+            if self.isRecording == True:
+                self.clickRecord()
 
-    def emergencyDetection(self):
-        road_state = self.emergency_model.RTstreaming()
-        if road_state == "Emergency":
-            self.selectRoad("side_park")
+        if self.isDrowsy1 == True and self.isDrowsy2 == False:
+            self.isDrowsy2 = True
+            msg = self.TCP.encodeMsg("wake_up")
+            self.sendMsg(msg)
+            self.labelLegCam.setStyleSheet("border: 5px solid red")
+            self.start = time.time()
+        elif self.isDrowsy1 == True and self.isDrowsy2 == True:
+            self.end = time.time()
+            self.duration = self.end - self.start
+
+            if self.duration > 3:
+                msg = self.TCP.encodeMsg("side_parking")
+                self.sendMsg(msg)
+                self.selectRoad("side_park")
+                self.emergencyLogger()
+
+    def updateEmergency(self, value):
+        if value == "Emergency":
+            self.isEmergency1 = True
+            self.select_road = "side_park"
+            self.labelThread.show() 
+            self.labelThread.setText("Emergency Situation")
+            self.labelThread.setStyleSheet("background-color: red; color: white; font-size: 20px;")
+        else:
+            self.isEmergency1 = False
+            self.isEmergency2 = False
+            self.labelThread.hide()
+            if self.select_road == "side_park":
+                self.selectRoad("center")
+
+    def emergencyLogger(self):
+        if self.isEmergency1 != self.isEmergency2:
+            sql = "INSERT INTO emergency_log (driver_id) VALUES (%s)"
+            self.db.cur.execute(sql, [self.driver_id])
+            print("hello")
+            self.db.local.commit()
+            print("emergency log committed")
         else:
             pass
 
@@ -585,16 +721,6 @@ class MainWindow(QMainWindow, form_class):
 
             if self.authentified == False:
                 self.authentification(frame)
-            
-            else:
-                self.drowsyDetection(frame)
-            
-            if self.isDrowsy1 != self.isDrowsy2:
-                self.sendMsg("emergency")
-
-            """
-            TODO: side_park
-            """
 
             h, w, c = frame.shape
             qImg = QImage(frame, w, h, w*c, QImage.Format_RGB888)
@@ -621,34 +747,36 @@ class MainWindow(QMainWindow, form_class):
             try:
                 '''
                     # direction : straight, left, right
-                    # select_road : center, left, right, side_park
+                    # road_selection : center, left, right, side_park
                 '''
-                self.road_segment = self.segment_model(frame, self.direction, self.road, obstacle)
+                self.road_segment = self.segment_model(frame, self.direction, self.road_selection, obstacle)
                 
                 slope = self.road_segment["slope"]
                 avoid = self.road_segment["avoid"]
                 is_side = self.road_segment["is_side"]
 
-                if not(is_side) and self.road != 'center':
-                    self.road = 'center'
-                if avoid != self.avoid_check and self.check:
-                    self.check = False
+                if not(is_side) and self.road_selection != 'center' and self.isEmergency1 == False:
+                    self.select_road = 'center'
+                
+                if obstacle != None:
+                    self.avoid_check = True
+                    self.road_selection = 'left'
                     self.st = time.time()
-                    if avoid:
-                        self.avoid_check = avoid
-                        self.road_select = 'left'
-                    else:
-                        self.road_select = 'center'
-                        self.avoid_check = avoid
+                else: 
+                    if self.dt > 8 and self.dt < 10:
+                        self.road_selection = 'right'
+                    elif self.dt > 1:
+                        self.road_selection = 'center'
 
-                if self.avoid_check:
+                    if self.dt > 14:
+                        self.avoid_check = False
+                        self.st = 0
+                        self.et = 0
+                        self.dt = 0
+                \
+                if self.avoid_check and obstacle==None:
                     self.et = time.time()
                     self.dt = self.et - self.st
-                    if self.dt > 2 and self.dt <= 6:
-                        self.road_select = 'right'
-                    elif self.dt > 6:
-                        self.st = time.time()
-                        self.check = True
             except:
                 pass
 
@@ -656,10 +784,14 @@ class MainWindow(QMainWindow, form_class):
 
             if self.isDrive == True:
                 if order == 'drive':
+                    if "red_light" in self.cls_list:
+                        self.ab_order = "stop"
+                    elif "green_light" in self.cls_list:
+                        self.ab_order = "drive"
+
                     try:
                         if slope:
                             th = self.threshold
-                            th_2 = self.threshold_2
                             th_r = th
                             th_l = - th
 
@@ -667,26 +799,56 @@ class MainWindow(QMainWindow, form_class):
                                 response = "drive"
                             elif slope > th_r:
                                 response = "R1"
-                                if slope > th_r + 20:
+                                if slope > th_r + 20: 
                                     response = "R3"
+                                    if self.road_selection == "side_park" or self.road_selection == "right":
+                                        response = "R2"
 
                             elif slope < th_l:
                                 response = "L1"
                                 if slope < th_l - -20:
                                     response = "L3"
-                            print(slope, response)
+                                    if self.road_selection == "left" or self.road_selection == "side_park":
+                                        response = "L2"
+
+                            self.count_nd = 0
                         else:
                             response = "drive"
+                            self.count_nd = 0
                     except:
-                        response = "no driveway"
+                        response = "no_drive_way"
+                        self.count_nd += 1
+                        if self.count_nd > 20:
+                            response = "reverse"
                 else:
                     response = "stop"
             else:
+                if self.isReverse == True:
+                    response = "reverse"
+                else:
+                    response = "stop"
+
+            if self.isEmergency1 != self.isEmergency2:
+                response = "side_parking"
+                message = self.TCP.encodeMsg(response)
+                self.sendMsg(message)
+                self.selectRoad("side_park")
+                self.isEmergency2 = True
+                print("emergency occured select road ", self.road_selection)
+                
+            if self.ab_order == "stop":
                 response = "stop"
 
-            # message = self.TCP.encodeMsg(response)
-            self.sendMsg(response)
-            self.updateUI(self.cls_list, self.direction, self.road_select)
+            if self.isPowerOn == False:
+                response = "wait"
+            
+            if response != self.prev_order:
+                self.prev_order = response
+                message = self.TCP.encodeMsg(response)
+                self.sendMsg(message)
+                # sql = "INSERT INTO direction_log (driver_id, response) VALUES (%s, %s)"
+
+            self.updateUI(self.cls_list, self.direction, self.road_selection)
 
             self.leg_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             qImg = QImage(self.leg_frame, w, h, w*c, QImage.Format_RGB888)
@@ -705,3 +867,5 @@ if __name__ == "__main__":
     sys.exit(app.exec_())
     window.close_connection()
     window.db.closeLocal()
+
+    window.cassServer.client_socket.close()

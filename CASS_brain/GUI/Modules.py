@@ -33,16 +33,20 @@ class Thread(QThread):
 
 class TCP():
     def __init__(self):
-        self.esp32_ip = '192.168.9.46'  # ESP32의 IP 주소
-        self.esp32_port = 8080 
+        self.esp32_ip = '192.168.0.28'  # ESP32의 IP 주소
+        self.esp32_port = 600
         self.message = None
 
     def encodeMsg(self, msg):
         match(msg):
             case "connect":
                 self.message = "11\n"
-            case "soyoung": # user_name
+            case "authentified": # user_name
                 self.message = "21\n"
+            case "power_on":
+                self.message = "22\n"
+            case "power_off":
+                self.message = "23\n"
             case "drive":
                 self.message = "31\n"
             case "stop":
@@ -63,11 +67,11 @@ class TCP():
                 self.message = "52\n"
             case "R3":
                 self.message = "53\n"
-            case "side_parking":
-                self.message = "88\n"
             case "no_drive_way":
                 self.message = "77\n"
-            case "emergency":
+            case "side_parking":
+                self.message = "88\n"
+            case "wake_up":
                 self.message = "99\n"
         
         return self.message
