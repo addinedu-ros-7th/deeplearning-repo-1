@@ -13,7 +13,7 @@ import asyncio
 # tts 를 위한 모듈
 from gtts import gTTS
 from playsound import playsound
-import tempfile  # 임시 파일 생성
+import tempfile 
 
 # stt 를 위한 모듈
 import base64
@@ -151,10 +151,10 @@ class CASS_BOT(nn.Module):
         output = chain.invoke({"messages": [{"role": "user", "content": input}]})
         return output
 
-    def check_result(self, output):
+    def check_result(self, input):
         self.flag = None  
         self.stt_order = None
-        result = output
+        result = input
         # 시동 켜기
         if '시동' in result and ('걸' in result or '켜' in result):
             if ('off' in self.stt_order_list or self.stt_order_list == []):
@@ -283,16 +283,16 @@ class CASS_BOT(nn.Module):
             self.run_listener()
             await asyncio.sleep(1)
 
+    def start_event_loop(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self.run_async())
+
     def run(self):
         # asyncio 이벤트 루프를 별도의 스레드에서 실행
         loop_thread = threading.Thread(target=self.start_event_loop)
         loop_thread.daemon = True
         loop_thread.start()
-
-    def start_event_loop(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self.run_async())
 
 
 if __name__ == "__main__":
