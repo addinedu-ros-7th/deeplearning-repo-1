@@ -104,7 +104,7 @@
 |GUI| <img src="https://img.shields.io/badge/PyQt5-41CD52?style=for-the-badge&logo=Qt&logoColor=white" style="width: 67px; height: 20px;">
 |통신|<img src="https://img.shields.io/badge/SocKet-C93CD7?style=flat&logo=SocKet&logoColor=white" />|
 |하드웨어|<img src="https://img.shields.io/badge/ARDUINO UNO-00878F?style=for-the-badge&logo=Arduino&logoColor=white" style="width: 97px; height: 20px;">
-|형상관리 및 협업|<img src="https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=GitHub&logoColor=white"/> <img src="https://img.shields.io/badge/Slack-4A154B?style=for-the-badge&logo=Slack&logoColor=white" style="width: 67px; height: 20px;"/> <img src="https://img.shields.io/badge/Confluence-172B4D?style=flat&logo=Confluence&logoColor=white" style="width: 87px; height: 20px;"><img src="https://img.shields.io/badge/Jira-0052CC?style=for-the-badge&logo=Jira&logoColor=white" style="width: 87px; height: 20px;">|
+|형상관리 및 협업|<img src="https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=GitHub&logoColor=white"/> <img src="https://img.shields.io/badge/Slack-4A154B?style=for-the-badge&logo=Slack&logoColor=white" style="width: 67px; height: 20px;"/> <img src="https://img.shields.io/badge/Confluence-172B4D?style=flat&logo=Confluence&logoColor=white" style="width: 87px; height: 20px;"> <img src="https://img.shields.io/badge/Jira-0052CC?style=for-the-badge&logo=Jira&logoColor=white" style="width: 60px; height: 20px;">|
 
 ---   
 
@@ -124,13 +124,13 @@
 
 * 동적 장애물 정지
   
-<img src="https://github.com/user-attachments/assets/7dd85076-4389-4137-bea0-d1840de656eb" width="500"/><br/>
-<img src="" width="500"/><br/>
+<img src="https://github.com/user-attachments/assets/1209918c-d7b0-41ee-9a8b-a6c690442a51" height="350"/>
+<img src="https://github.com/user-attachments/assets/7dd85076-4389-4137-bea0-d1840de656eb" height="350"/><br/>
 
 * 정적 장애물 회피
   
-<img src="https://github.com/user-attachments/assets/ef43e349-135c-48bb-8ec5-3ec66727ff91" width="500"/><br/>
-<img src="" width="500"/><br/>
+<img src="https://github.com/user-attachments/assets/9ee5e15a-e05a-4927-a3ae-0b55ddee4da1" width="360"/>
+<img src="https://github.com/user-attachments/assets/ef43e349-135c-48bb-8ec5-3ec66727ff91" width="500"/>
 
 * 졸음인식 기상제동
 
