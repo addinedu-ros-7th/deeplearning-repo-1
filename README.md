@@ -53,18 +53,22 @@
 *갓길-후면카메라가 있다면 주행방향을 선택할 수 있겠지만 일차적으로 갓길로 제한을 둠.
 
 ### 2.2. System Architecture
-<img src="https://github.com/user-attachments/assets/8aa1809b-4dad-46a1-91dc-6f13010a73ef" width="900"/><br/>
+<img src="https://github.com/user-attachments/assets/8aa1809b-4dad-46a1-91dc-6f13010a73ef" width="500"/><br/>
 
 ### 2.3. State Diagram
 
 * State Diagram - 전체
-<img src="https://github.com/user-attachments/assets/c42af502-7edc-47f0-b7da-32a74b11be84" width="900"/><br/>   
+  
+<img src="https://github.com/user-attachments/assets/c42af502-7edc-47f0-b7da-32a74b11be84" width="500"/><br/>   
 
-* State Diagram - 주행단계 
-<img src="https://github.com/user-attachments/assets/c40b1d02-db2b-49bd-8a0c-1aab41642fde" width="900"/><br/>
+* State Diagram - 주행
+  
+<img src="https://github.com/user-attachments/assets/c40b1d02-db2b-49bd-8a0c-1aab41642fde" width="500"/><br/>
 
-### 2.4. 회피주행 Sequence Diagram
-<img src="https://github.com/user-attachments/assets/105eb515-0f8a-48f5-934e-c89579f577ed" width="900"/><br/>
+### 2.4. Sequence Diagram
+* Sequence Diagram - 회피 주행
+  
+<img src="https://github.com/user-attachments/assets/105eb515-0f8a-48f5-934e-c89579f577ed" width="700"/><br/>
 
 
 
@@ -82,12 +86,13 @@
 |팀원|장윤정|졸음 인식 알고리즘 개발, GUI 구성, 주행 환경 구성, Git 관리|
 
 ### 3.2. 일정 관리
-<img src="https://github.com/user-attachments/assets/14f37285-149b-45f9-beda-1ad71d52fc2f" width="900"/><br/>
+* Jira 타임라인
+  
+<img src="https://github.com/user-attachments/assets/411eb735-5965-4a57-b3de-358f6062e63b" width="500"/><br/>
 
-
-### 3.2.1 스프린트 / 버전 활용
-
-
+* Jira Sprint
+  
+<img src="https://github.com/user-attachments/assets/14f37285-149b-45f9-beda-1ad71d52fc2f" width="500"/><br/>
 
 
 ### 3.3. 활용 기술
@@ -99,7 +104,7 @@
 |GUI| <img src="https://img.shields.io/badge/PyQt5-41CD52?style=for-the-badge&logo=Qt&logoColor=white" style="width: 67px; height: 20px;">
 |통신|<img src="https://img.shields.io/badge/SocKet-C93CD7?style=flat&logo=SocKet&logoColor=white" />|
 |하드웨어|<img src="https://img.shields.io/badge/ARDUINO UNO-00878F?style=for-the-badge&logo=Arduino&logoColor=white" style="width: 97px; height: 20px;">
-|형상관리 및 협업|<img src="https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=GitHub&logoColor=white"/> <img src="https://img.shields.io/badge/Slack-4A154B?style=for-the-badge&logo=Slack&logoColor=white" style="width: 67px; height: 20px;"/> <img src="https://img.shields.io/badge/Confluence-172B4D?style=flat&logo=Confluence&logoColor=white" style="width: 87px; height: 20px;">|
+|형상관리 및 협업|<img src="https://img.shields.io/badge/GitHub-181717?style=flat-square&logo=GitHub&logoColor=white"/> <img src="https://img.shields.io/badge/Slack-4A154B?style=for-the-badge&logo=Slack&logoColor=white" style="width: 67px; height: 20px;"/> <img src="https://img.shields.io/badge/Confluence-172B4D?style=flat&logo=Confluence&logoColor=white" style="width: 87px; height: 20px;"><img src="https://img.shields.io/badge/Jira-0052CC?style=for-the-badge&logo=Jira&logoColor=white" style="width: 87px; height: 20px;">|
 
 ---   
 
@@ -107,20 +112,45 @@
 
 ### 4.1. 기능별 영상
 
-* 자동제어
-* 자동제어
-* 자동제어
-* 자동제어
-* 자동제어
-* 자동제어
+* 차선유지
+  
+<img src="https://github.com/user-attachments/assets/79043081-8f52-4954-9137-3491db77f19a" height="280"/>
+<img src="https://github.com/user-attachments/assets/f46b42c1-5772-4d4b-8c73-25289aced102" width="500"/><br/>
+  
+* 신호준수
+  
+<img src="https://github.com/user-attachments/assets/6d73febc-3896-4611-9458-3fbbd2853b9a" width="500"/><br/>
+<img src="" width="500"/><br/>
 
-* 수동제어
+* 동적 장애물 정지
+  
+<img src="https://github.com/user-attachments/assets/7dd85076-4389-4137-bea0-d1840de656eb" width="500"/><br/>
+<img src="" width="500"/><br/>
 
-* 보안
-* 보안
-* 
-* 안전
-* 안전
+* 정적 장애물 회피
+  
+<img src="https://github.com/user-attachments/assets/ef43e349-135c-48bb-8ec5-3ec66727ff91" width="500"/><br/>
+<img src="" width="500"/><br/>
+
+* 졸음인식 기상제동
+
+<img src="https://github.com/user-attachments/assets/03090a1e-2db6-4366-a2ca-e3e548064084" height="285"/>
+<img src="https://github.com/user-attachments/assets/23af594c-a4fd-45d7-a0ee-383c7f713ea4" width="500"/><br/>
+
+* 응급상황 갓길주차
+
+<img src="https://github.com/user-attachments/assets/ba6911a7-a160-469f-8f29-dc3214e3db5c" height="320"/> 
+<img src="https://github.com/user-attachments/assets/1ee69d80-63f6-4fb7-8030-370c57b30a64" width="500"/><br/>
+
+* 얼굴인식 / 음성인식 보안인증
+
+<img src="https://github.com/user-attachments/assets/fdaf5a00-fa2c-4c79-8c05-9be700800443" width="500"/>
+
+https://github.com/user-attachments/assets/f60c1f17-6808-447d-baa6-fd2412580095
+
+* 음성명령
+
+https://github.com/user-attachments/assets/d443c966-e62f-4cb3-9057-f16dc9be2318
 
   
 ### 4.2. 상세 구현 결과
